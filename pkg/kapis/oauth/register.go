@@ -44,14 +44,15 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 	passwordAuthenticator auth.PasswordAuthenticator,
 	oauth2Authenticator auth.OAuthAuthenticator,
 	loginRecorder auth.LoginRecorder,
-	options *authentication.Options) error {
+	options *authentication.Options,
+	passcodeAuthenticator auth.PasscodeAuthenticator) error {
 
 	ws := &restful.WebService{}
 	ws.Path("/oauth").
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
-	handler := newHandler(im, tokenOperator, passwordAuthenticator, oauth2Authenticator, loginRecorder, options)
+	handler := newHandler(im, tokenOperator, passwordAuthenticator, oauth2Authenticator, loginRecorder, options, passcodeAuthenticator)
 
 	ws.Route(ws.GET("/.well-known/openid-configuration").To(handler.discovery).
 		Doc("The OpenID Provider's configuration information can be retrieved."))
@@ -116,10 +117,10 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 		Param(ws.FormParameter("username", "The resource owner username.").Required(false)).
 		Param(ws.FormParameter("password", "The resource owner password.").Required(false)).
 		Param(ws.FormParameter("code", "Valid authorization code.").Required(false)).
+		Param(ws.FormParameter("passcode", "The resource owner passcode.").Required(false)).
 		To(handler.token).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
-
 	// Authorization callback URL, where the end of the URL contains the identity provider name.
 	// The provider name is also used to build the callback URL.
 	ws.Route(ws.GET("/callback/{callback}").
@@ -158,8 +159,35 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), "").
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
 
-	c.Add(ws)
+	// enable otp
+	ws.Route(ws.POST("/enable_2fa").
+		Consumes(contentTypeFormData).
+		Param(ws.FormParameter("username", "The otp username.").Required(false)).
+		Param(ws.FormParameter("issuer", "The otp issuer.").Required(false)).
+		Param(ws.FormParameter("global", "The otp global flag.").Required(true)).
+		Param(ws.FormParameter("faType", "The 2fa type.").Required(true)).
+		To(handler.enable2fa).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
 
+	// enable otp
+	ws.Route(ws.POST("/disable_2fa").
+		Consumes(contentTypeFormData).
+		Param(ws.FormParameter("username", "The otp username.").Required(true)).
+		Param(ws.FormParameter("global", "The otp global flag.").Required(true)).
+		To(handler.disable2fa).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
+
+	// get otp png
+	ws.Route(ws.GET("/otp/barcode").
+		Consumes(contentTypeFormData).
+		Param(ws.FormParameter("username", "The otp username.").Required(true)).
+		To(handler.otpBarcode).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
+
+	c.Add(ws)
 	// legacy auth API
 	legacy := &restful.WebService{}
 	legacy.Path("/kapis/iam.kubesphere.io/v1alpha2/login").

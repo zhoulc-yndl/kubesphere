@@ -20,7 +20,6 @@ package auth
 
 import (
 	"context"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	kubesphere "kubesphere.io/kubesphere/pkg/client/clientset/versioned"
@@ -122,7 +121,6 @@ func (p *passwordAuthenticator) Authenticate(_ context.Context, username, passwo
 			return nil, "", AccountIsNotActiveError
 		}
 	}
-
 	// if the password is not empty, means that the password has been reset, even if the user was mapping from IDP
 	if user != nil && user.Spec.EncryptedPassword != "" {
 		if err = PasswordVerify(user.Spec.EncryptedPassword, password); err != nil {

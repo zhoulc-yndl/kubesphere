@@ -23,7 +23,7 @@ import (
 )
 
 func getProcessStart() (float64, error) {
-	processHandle := windows.CurrentProcess()
+	processHandle, _ := windows.GetCurrentProcess()
 
 	var creationTime, exitTime, kernelTime, userTime windows.Filetime
 	if err := windows.GetProcessTimes(processHandle, &creationTime, &exitTime, &kernelTime, &userTime); err != nil {

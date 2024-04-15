@@ -94,7 +94,8 @@ const (
 	defaultConfigurationName = "kubesphere"
 
 	// DefaultConfigurationPath the default location of the configuration file
-	defaultConfigurationPath = "/etc/kubesphere"
+	//defaultConfigurationPath = "/etc/kubesphere"
+	defaultConfigurationPath = "D:\\Projects\\go-projects\\src\\kubesphere.io\\etc\\kubesphere"
 )
 
 type config struct {

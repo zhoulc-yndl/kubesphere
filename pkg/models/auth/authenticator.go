@@ -21,6 +21,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"github.com/emicklei/go-restful"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -42,6 +43,9 @@ import (
 var (
 	RateLimitExceededError  = fmt.Errorf("auth rate limit exceeded")
 	IncorrectPasswordError  = fmt.Errorf("incorrect password")
+	IncorrectPasscodeError  = fmt.Errorf("incorrect passcode")
+	IncorrectOtpError       = fmt.Errorf("incorrect OTP")
+	IncorrectSmsError       = fmt.Errorf("incorrect SMS")
 	AccountIsNotActiveError = fmt.Errorf("account is not active")
 )
 
@@ -49,6 +53,15 @@ var (
 // username and password.
 type PasswordAuthenticator interface {
 	Authenticate(ctx context.Context, username, password string) (authuser.Info, string, error)
+}
+type PasscodeAuthenticator interface {
+	Authenticate(ctx context.Context, username, password, faCode string) (authuser.Info, string, error)
+	EnableOTP(req *restful.Request, response *restful.Response, username, issuer string, global string)
+	ResetOTP(req *restful.Request, response *restful.Response, username, issuer string)
+	Disable2fa(req *restful.Request, response *restful.Response, username string, global string)
+	OtpBarcode(req *restful.Request, response *restful.Response, username string)
+	EnableSMS(req *restful.Request, response *restful.Response, username string, global string)
+	IsAdmin(username string) bool
 }
 
 type OAuthAuthenticator interface {

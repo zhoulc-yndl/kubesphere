@@ -77,6 +77,7 @@ type TokenReview struct {
 type LoginRequest struct {
 	Username string `json:"username" description:"username"`
 	Password string `json:"password" description:"password"`
+	Passcode string `json:"passcode,omitempty" description:"passcode"`
 }
 
 func (request *TokenReview) Validate() error {
@@ -125,6 +126,7 @@ type handler struct {
 	options               *authentication.Options
 	tokenOperator         auth.TokenManagementInterface
 	passwordAuthenticator auth.PasswordAuthenticator
+	passcodeAuthenticator auth.PasscodeAuthenticator
 	oauthAuthenticator    auth.OAuthAuthenticator
 	loginRecorder         auth.LoginRecorder
 }
@@ -134,11 +136,13 @@ func newHandler(im im.IdentityManagementInterface,
 	passwordAuthenticator auth.PasswordAuthenticator,
 	oauthAuthenticator auth.OAuthAuthenticator,
 	loginRecorder auth.LoginRecorder,
-	options *authentication.Options) *handler {
+	options *authentication.Options,
+	passcodeAuthenticator auth.PasscodeAuthenticator) *handler {
 	return &handler{im: im,
 		tokenOperator:         tokenOperator,
 		passwordAuthenticator: passwordAuthenticator,
 		oauthAuthenticator:    oauthAuthenticator,
+		passcodeAuthenticator: passcodeAuthenticator,
 		loginRecorder:         loginRecorder,
 		options:               options}
 }
@@ -368,7 +372,104 @@ func (h *handler) login(request *restful.Request, response *restful.Response) {
 		api.HandleBadRequest(response, request, err)
 		return
 	}
-	h.passwordGrant(loginRequest.Username, loginRequest.Password, request, response)
+	//h.passwordGrant(loginRequest.Username,loginRequest.Password,request,response)
+	h.passcodeGrant(loginRequest.Username, loginRequest.Password, loginRequest.Passcode, request, response)
+}
+
+func (h *handler) enable2fa(req *restful.Request, response *restful.Response) {
+
+	// 根据token获取用户信息
+	authenticated, _ := request.UserFrom(req.Request.Context())
+	if authenticated == nil || authenticated.GetName() == user.Anonymous {
+		response.WriteHeaderAndEntity(http.StatusUnauthorized, oauth.ErrorLoginRequired)
+		return
+	}
+	detail, err := h.im.DescribeUser(authenticated.GetName())
+	if err != nil {
+		response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
+		return
+	}
+	//判断用户角色，普通用户无权限设置双因素认证
+	isAdmin := h.passcodeAuthenticator.IsAdmin(detail.Name)
+	if isAdmin {
+		username := req.QueryParameter("username")
+		issuer := req.QueryParameter("issuer")
+		global := req.QueryParameter("global")
+		faType := req.QueryParameter("faType")
+		if faType == "" {
+			response.WriteHeaderAndEntity(http.StatusBadRequest, "faType is null")
+			return
+		} else if faType == iamv1alpha2.FATypeOtp {
+			if issuer == "" {
+				response.WriteHeaderAndEntity(http.StatusBadRequest, "issuer is null")
+				return
+			}
+			h.passcodeAuthenticator.EnableOTP(req, response, username, issuer, global)
+		} else if faType == iamv1alpha2.FATypeSms {
+			if username == "" {
+				response.WriteHeaderAndEntity(http.StatusBadRequest, "username is null")
+				return
+			}
+			h.passcodeAuthenticator.EnableSMS(req, response, username, global)
+		}
+	} else {
+		response.WriteHeaderAndEntity(http.StatusForbidden, http.StatusText(http.StatusForbidden))
+		return
+	}
+
+}
+
+func (h *handler) disable2fa(req *restful.Request, response *restful.Response) {
+	// 根据token获取用户信息
+	authenticated, _ := request.UserFrom(req.Request.Context())
+	if authenticated == nil || authenticated.GetName() == user.Anonymous {
+		response.WriteHeaderAndEntity(http.StatusUnauthorized, oauth.ErrorLoginRequired)
+		return
+	}
+	detail, err := h.im.DescribeUser(authenticated.GetName())
+	if err != nil {
+		response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
+		return
+	}
+	//判断用户角色，普通用户无权限设置双因素认证
+	isAdmin := h.passcodeAuthenticator.IsAdmin(detail.Name)
+	if isAdmin {
+		username := req.QueryParameter("username")
+		global := req.QueryParameter("global")
+		h.passcodeAuthenticator.Disable2fa(req, response, username, global)
+	} else {
+		response.WriteHeaderAndEntity(http.StatusForbidden, http.StatusText(http.StatusForbidden))
+		return
+	}
+
+}
+
+func (h *handler) otpBarcode(req *restful.Request, response *restful.Response) {
+	// 根据token获取用户信息
+	authenticated, _ := request.UserFrom(req.Request.Context())
+	if authenticated == nil || authenticated.GetName() == user.Anonymous {
+		response.WriteHeaderAndEntity(http.StatusUnauthorized, oauth.ErrorLoginRequired)
+		return
+	}
+	detail, err := h.im.DescribeUser(authenticated.GetName())
+	if err != nil {
+		response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
+		return
+	}
+
+	//判断用户角色，普通用户只能获取自己的otp二维码
+	isAdmin := h.passcodeAuthenticator.IsAdmin(detail.Name)
+	if isAdmin {
+		username := req.QueryParameter("username")
+		if username == "" {
+			response.WriteErrorString(http.StatusBadRequest, "username is null")
+			return
+		}
+		h.passcodeAuthenticator.OtpBarcode(req, response, username)
+	} else {
+		h.passcodeAuthenticator.OtpBarcode(req, response, detail.Name)
+	}
+
 }
 
 // To obtain an Access Token, an ID Token, and optionally a Refresh Token,
@@ -452,6 +553,52 @@ func (h *handler) passwordGrant(username string, password string, req *restful.R
 			return
 		default:
 			response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
+			return
+		}
+	}
+
+	result, err := h.issueTokenTo(authenticated)
+	if err != nil {
+		response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
+		return
+	}
+
+	requestInfo, _ := request.RequestInfoFrom(req.Request.Context())
+	if err = h.loginRecorder.RecordLogin(authenticated.GetName(), iamv1alpha2.Token, provider, requestInfo.SourceIP, requestInfo.UserAgent, nil); err != nil {
+		klog.Errorf("Failed to record successful login for user %s, error: %v", authenticated.GetName(), err)
+	}
+
+	response.WriteEntity(result)
+}
+func (h *handler) passcodeGrant(username string, password string, passcode string, req *restful.Request, response *restful.Response) {
+
+	authenticated, provider, err := h.passcodeAuthenticator.Authenticate(req.Request.Context(), username, password, passcode)
+	if err != nil {
+		switch err {
+		case auth.AccountIsNotActiveError:
+			response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidGrant(err))
+			return
+		case auth.IncorrectPasswordError:
+			requestInfo, _ := request.RequestInfoFrom(req.Request.Context())
+			if err := h.loginRecorder.RecordLogin(username, iamv1alpha2.Token, provider, requestInfo.SourceIP, requestInfo.UserAgent, err); err != nil {
+				klog.Errorf("Failed to record unsuccessful login attempt for user %s, error: %v", username, err)
+			}
+			response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidGrant(err))
+			return
+		case auth.RateLimitExceededError:
+			response.WriteHeaderAndEntity(http.StatusTooManyRequests, oauth.NewInvalidGrant(err))
+			return
+		default:
+			response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
+			return
+		}
+	}
+
+	// 判断双因素认证是否开启，开启则返回开启状态和方式
+	extra := authenticated.GetExtra()
+	if value, ok := extra[iamv1alpha2.ExtraFAOpenStatus]; ok {
+		if value[0] == "true" {
+			response.WriteEntity(authenticated)
 			return
 		}
 	}
