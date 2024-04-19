@@ -230,7 +230,7 @@ func (p *passcodeAuthenticator) set2faOpen(request *restful.Request, response *r
 
 	if faType == iamv1alpha2.FATypeOtp {
 		// 如果不存在OTPKey，则更新
-		if user.Spec.OTPKey.Orig == "" {
+		if user.Spec.OTPKey == nil || user.Spec.OTPKey.Orig == "" {
 			// 生成 TOTP 密钥配置
 			opts := totp.GenerateOpts{
 				Issuer:      issuer,
@@ -282,7 +282,7 @@ func (p *passcodeAuthenticator) set2faOpen(request *restful.Request, response *r
 	if faType == iamv1alpha2.FATypeSms {
 		if user.Spec.Phone != "" {
 			// 使用otp生成短信验证码
-			if user.Spec.SMSKey.Orig == "" {
+			if user.Spec.SMSKey == nil || user.Spec.SMSKey.Orig == "" {
 				// 生成 TOTP 密钥配置
 				opts := totp.GenerateOpts{
 					Issuer:      "sms",
@@ -487,9 +487,8 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		}
 	}
 	phone := user.Spec.Phone
-	otpKey, _ := otp.NewKeyFromURL(user.Spec.OTPKey.Orig)
-	otpSecret := otpKey.Secret()
-	println(phone)
+	smsKey, _ := otp.NewKeyFromURL(user.Spec.SMSKey.Orig)
+	smsOtpSecret := smsKey.Secret()
 	var smsSecret *v1.Secret
 	smsSecret = secret.(*v1.Secret)
 	appSecret := smsSecret.Data["Secret"]
@@ -532,7 +531,7 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 	// 使用otp生成验证码，300s有效期
 	t := time.Now().UTC()
 	counter := int64(math.Floor(float64(t.Unix()) / float64(300)))
-	otpstr, err := hotp.GenerateCodeCustom(otpSecret, uint64(counter), hotp.ValidateOpts{
+	otpstr, err := hotp.GenerateCodeCustom(smsOtpSecret, uint64(counter), hotp.ValidateOpts{
 		Digits:    otp.DigitsSix,
 		Algorithm: otp.AlgorithmSHA1,
 	})
