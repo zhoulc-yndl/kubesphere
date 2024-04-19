@@ -17,6 +17,7 @@ limitations under the License.
 package oauth
 
 import (
+	resourcev1alpha3 "kubesphere.io/kubesphere/pkg/models/resources/v1alpha3/resource"
 	"net/http"
 
 	"kubesphere.io/kubesphere/pkg/apiserver/authentication"
@@ -45,14 +46,16 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 	oauth2Authenticator auth.OAuthAuthenticator,
 	loginRecorder auth.LoginRecorder,
 	options *authentication.Options,
-	passcodeAuthenticator auth.PasscodeAuthenticator) error {
+	passcodeAuthenticator auth.PasscodeAuthenticator,
+	resourceGetterV1alpha3 *resourcev1alpha3.ResourceGetter,
+) error {
 
 	ws := &restful.WebService{}
 	ws.Path("/oauth").
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
-	handler := newHandler(im, tokenOperator, passwordAuthenticator, oauth2Authenticator, loginRecorder, options, passcodeAuthenticator)
+	handler := newHandler(im, tokenOperator, passwordAuthenticator, oauth2Authenticator, loginRecorder, options, passcodeAuthenticator, resourceGetterV1alpha3)
 
 	ws.Route(ws.GET("/.well-known/openid-configuration").To(handler.discovery).
 		Doc("The OpenID Provider's configuration information can be retrieved."))
@@ -170,7 +173,16 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
 
-	// enable otp
+	// reset otp
+	ws.Route(ws.POST("/reset_otp").
+		Consumes(contentTypeFormData).
+		Param(ws.FormParameter("username", "The otp username.").Required(true)).
+		Param(ws.FormParameter("issuer", "The otp issuer.").Required(true)).
+		To(handler.resetOtp).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
+
+	// disable otp
 	ws.Route(ws.POST("/disable_2fa").
 		Consumes(contentTypeFormData).
 		Param(ws.FormParameter("username", "The otp username.").Required(true)).
@@ -187,6 +199,13 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
 
+	//ws.Route(ws.GET("/sms/send").
+	//	Consumes(contentTypeFormData).
+	//	Param(ws.FormParameter("username", "The otp username.").Required(true)).
+	//	To(handler.sendMessage).
+	//	Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
+	//	Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
+
 	c.Add(ws)
 	// legacy auth API
 	legacy := &restful.WebService{}
@@ -197,6 +216,14 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 		To(handler.login).
 		Deprecate().
 		Doc("KubeSphere APIs support token-based authentication via the Authtoken request header. The POST Login API is used to retrieve the authentication token. After the authentication token is obtained, it must be inserted into the Authtoken header for all requests.").
+		Reads(LoginRequest{}).
+		Returns(http.StatusOK, api.StatusOK, oauth.Token{}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
+
+	legacy.Route(legacy.POST("/sms/send").
+		To(handler.sendMessage).
+		Deprecate().
+		Doc("send sms passcode").
 		Reads(LoginRequest{}).
 		Returns(http.StatusOK, api.StatusOK, oauth.Token{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))

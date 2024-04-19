@@ -34,13 +34,13 @@ import (
 // Validate a TOTP using the current time.
 // A shortcut for ValidateCustom, Validate uses a configuration
 // that is compatible with Google-Authenticator and most clients.
-func Validate(passcode string, secret string) bool {
+func Validate(passcode string, secret string,period uint) bool {
 	rv, _ := ValidateCustom(
 		passcode,
 		secret,
 		time.Now().UTC(),
 		ValidateOpts{
-			Period:    30,
+			Period:    period,
 			Skew:      1,
 			Digits:    otp.DigitsSix,
 			Algorithm: otp.AlgorithmSHA1,

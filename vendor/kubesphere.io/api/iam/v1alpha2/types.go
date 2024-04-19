@@ -75,7 +75,7 @@ const (
 	ExtraEmail                            = FieldEmail
 	ExtraPhone                            = FieldPhone
 	ExtraFAOpenStatus                     = FieldFAOpenStatus
-	ExtraFAType                           = FieldFAType 
+	ExtraFAType                           = FieldFAType
 	ExtraIdentityProvider                 = "idp"
 	ExtraUID                              = "uid"
 	ExtraUsername                         = "username"
@@ -155,9 +155,8 @@ type UserSpec struct {
 	// +kubebuilder:default=false
 	FAOpenStatus bool   `json:"faOpenStatus"`
 	FAType       string `json:"faType"`
-	// +kubebuilder:default=false
-	OTPReset bool    `json:"otpReset"`
 	OTPKey   *OtpKey `json:"otpKey"`
+	SMSKey   *OtpKey `json:"smsKey"`
 	OTPBind  bool    `json:"otpBind"`
 }
 type OtpKey struct {

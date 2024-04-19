@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"kubesphere.io/kubesphere/pkg/models/resources/v1alpha3/resource"
 	"net/http"
 	rt "runtime"
 	"strconv"
@@ -257,7 +258,9 @@ func (s *APIServer) installKubeSphereAPIs(stopCh <-chan struct{}) {
 		auth.NewOAuthAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions),
 		auth.NewLoginRecorder(s.KubernetesClient.KubeSphere(), userLister),
 		s.Config.AuthenticationOptions,
-		auth.NewPasscodeAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions)))
+		auth.NewPasscodeAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions),
+		resource.NewResourceGetter(s.InformerFactory, s.RuntimeCache),
+	))
 	urlruntime.Must(servicemeshv1alpha2.AddToContainer(s.Config.ServiceMeshOptions, s.container, s.KubernetesClient.Kubernetes(), s.CacheClient))
 	urlruntime.Must(networkv1alpha2.AddToContainer(s.container, s.Config.NetworkOptions.WeaveScopeHost))
 	urlruntime.Must(kapisdevops.AddToContainer(s.container, s.Config.DevopsOptions.Endpoint))

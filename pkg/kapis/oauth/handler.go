@@ -18,6 +18,7 @@ package oauth
 
 import (
 	"fmt"
+	resourcev1alpha3 "kubesphere.io/kubesphere/pkg/models/resources/v1alpha3/resource"
 	"net/http"
 	"net/url"
 	"strings"
@@ -122,13 +123,14 @@ type discovery struct {
 }
 
 type handler struct {
-	im                    im.IdentityManagementInterface
-	options               *authentication.Options
-	tokenOperator         auth.TokenManagementInterface
-	passwordAuthenticator auth.PasswordAuthenticator
-	passcodeAuthenticator auth.PasscodeAuthenticator
-	oauthAuthenticator    auth.OAuthAuthenticator
-	loginRecorder         auth.LoginRecorder
+	im                     im.IdentityManagementInterface
+	options                *authentication.Options
+	tokenOperator          auth.TokenManagementInterface
+	passwordAuthenticator  auth.PasswordAuthenticator
+	passcodeAuthenticator  auth.PasscodeAuthenticator
+	oauthAuthenticator     auth.OAuthAuthenticator
+	loginRecorder          auth.LoginRecorder
+	resourceGetterV1alpha3 *resourcev1alpha3.ResourceGetter
 }
 
 func newHandler(im im.IdentityManagementInterface,
@@ -137,14 +139,17 @@ func newHandler(im im.IdentityManagementInterface,
 	oauthAuthenticator auth.OAuthAuthenticator,
 	loginRecorder auth.LoginRecorder,
 	options *authentication.Options,
-	passcodeAuthenticator auth.PasscodeAuthenticator) *handler {
+	passcodeAuthenticator auth.PasscodeAuthenticator,
+	resourceGetterV1alpha3 *resourcev1alpha3.ResourceGetter,
+) *handler {
 	return &handler{im: im,
-		tokenOperator:         tokenOperator,
-		passwordAuthenticator: passwordAuthenticator,
-		oauthAuthenticator:    oauthAuthenticator,
-		passcodeAuthenticator: passcodeAuthenticator,
-		loginRecorder:         loginRecorder,
-		options:               options}
+		tokenOperator:          tokenOperator,
+		passwordAuthenticator:  passwordAuthenticator,
+		oauthAuthenticator:     oauthAuthenticator,
+		passcodeAuthenticator:  passcodeAuthenticator,
+		loginRecorder:          loginRecorder,
+		options:                options,
+		resourceGetterV1alpha3: resourceGetterV1alpha3}
 }
 
 // tokenReview Implement webhook authentication interface
@@ -399,19 +404,21 @@ func (h *handler) enable2fa(req *restful.Request, response *restful.Response) {
 		if faType == "" {
 			response.WriteHeaderAndEntity(http.StatusBadRequest, "faType is null")
 			return
-		} else if faType == iamv1alpha2.FATypeOtp {
-			if issuer == "" {
-				response.WriteHeaderAndEntity(http.StatusBadRequest, "issuer is null")
-				return
-			}
-			h.passcodeAuthenticator.EnableOTP(req, response, username, issuer, global)
-		} else if faType == iamv1alpha2.FATypeSms {
-			if username == "" {
-				response.WriteHeaderAndEntity(http.StatusBadRequest, "username is null")
-				return
-			}
-			h.passcodeAuthenticator.EnableSMS(req, response, username, global)
 		}
+		//else if faType == iamv1alpha2.FATypeOtp {
+		//	if issuer == "" {
+		//		response.WriteHeaderAndEntity(http.StatusBadRequest, "issuer is null")
+		//		return
+		//	}
+		//	h.passcodeAuthenticator.EnableOTP(req, response, username, issuer, global)
+		//} else if faType == iamv1alpha2.FATypeSms {
+		//	if username == "" {
+		//		response.WriteHeaderAndEntity(http.StatusBadRequest, "username is null")
+		//		return
+		//	}
+		//	h.passcodeAuthenticator.EnableSMS(req, response, username, global)
+		//}
+		h.passcodeAuthenticator.Enable2fa(req, response, username, issuer, faType, global)
 	} else {
 		response.WriteHeaderAndEntity(http.StatusForbidden, http.StatusText(http.StatusForbidden))
 		return
@@ -470,6 +477,43 @@ func (h *handler) otpBarcode(req *restful.Request, response *restful.Response) {
 		h.passcodeAuthenticator.OtpBarcode(req, response, detail.Name)
 	}
 
+}
+
+func (h *handler) resetOtp(req *restful.Request, response *restful.Response) {
+	// 根据token获取用户信息
+	authenticated, _ := request.UserFrom(req.Request.Context())
+	if authenticated == nil || authenticated.GetName() == user.Anonymous {
+		response.WriteHeaderAndEntity(http.StatusUnauthorized, oauth.ErrorLoginRequired)
+		return
+	}
+	detail, err := h.im.DescribeUser(authenticated.GetName())
+	if err != nil {
+		response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
+		return
+	}
+
+	//判断用户角色，普通用户只能获取自己的otp二维码
+	isAdmin := h.passcodeAuthenticator.IsAdmin(detail.Name)
+	if isAdmin {
+		username := req.QueryParameter("username")
+		issuer := req.QueryParameter("issuer")
+		if username == "" {
+			response.WriteErrorString(http.StatusBadRequest, "username is null")
+			return
+		}
+		h.passcodeAuthenticator.ResetOTP(req, response, username, issuer)
+	}
+
+}
+func (h *handler) sendMessage(req *restful.Request, response *restful.Response) {
+	var loginRequest LoginRequest
+	err := req.ReadEntity(&loginRequest)
+	if err != nil {
+		api.HandleBadRequest(response, req, err)
+		return
+	}
+	secret, _ := h.resourceGetterV1alpha3.Get("secrets", "default", "global-sms-config-secret")
+	h.passcodeAuthenticator.SendMessage(req, response, loginRequest.Username, secret)
 }
 
 // To obtain an Access Token, an ID Token, and optionally a Refresh Token,

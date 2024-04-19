@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/emicklei/go-restful"
+	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -57,9 +58,11 @@ type PasswordAuthenticator interface {
 type PasscodeAuthenticator interface {
 	Authenticate(ctx context.Context, username, password, faCode string) (authuser.Info, string, error)
 	EnableOTP(req *restful.Request, response *restful.Response, username, issuer string, global string)
+	Enable2fa(req *restful.Request, response *restful.Response, username, issuer, faType, global string)
 	ResetOTP(req *restful.Request, response *restful.Response, username, issuer string)
 	Disable2fa(req *restful.Request, response *restful.Response, username string, global string)
 	OtpBarcode(req *restful.Request, response *restful.Response, username string)
+	SendMessage(req *restful.Request, response *restful.Response, username string, secret runtime.Object)
 	EnableSMS(req *restful.Request, response *restful.Response, username string, global string)
 	IsAdmin(username string) bool
 }
