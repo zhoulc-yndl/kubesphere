@@ -41,10 +41,10 @@ var routerNodeIPLabelSelector = map[string]string{
 }
 
 const (
-	servicemeshEnabled = "servicemesh.kubesphere.io/enabled"
-	sidecarInject      = "sidecar.istio.io/inject"
-	//ingressControllerFolder    = "/etc/kubesphere/ingress-controller"
-	ingressControllerFolder = "D:\\Projects\\go-projects\\src\\kubesphere.io\\etc\\kubesphere\\ingress-controller"
+	servicemeshEnabled      = "servicemesh.kubesphere.io/enabled"
+	sidecarInject           = "sidecar.istio.io/inject"
+	ingressControllerFolder = "/etc/kubesphere/ingress-controller"
+	//ingressControllerFolder = "D:\\Projects\\go-projects\\src\\kubesphere.io\\etc\\kubesphere\\ingress-controller"
 
 	ingressControllerPrefix    = "kubesphere-router-"
 	ingressControllerNamespace = "kubesphere-controls-system"
