@@ -185,7 +185,7 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 	// disable otp
 	ws.Route(ws.POST("/disable_2fa").
 		Consumes(contentTypeFormData).
-		Param(ws.FormParameter("username", "The otp username.").Required(true)).
+		Param(ws.FormParameter("username", "The otp username.").Required(false)).
 		Param(ws.FormParameter("global", "The otp global flag.").Required(true)).
 		To(handler.disable2fa).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).

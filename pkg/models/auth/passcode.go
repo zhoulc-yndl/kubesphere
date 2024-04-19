@@ -218,7 +218,7 @@ func (p *passcodeAuthenticator) Enable2fa(req *restful.Request, response *restfu
 				return
 			}
 		}
-		if user != nil && !user.Spec.FAOpenStatus {
+		if user != nil {
 			p.set2faOpen(req, response, user, issuer, faType)
 		}
 
@@ -460,6 +460,11 @@ func (p *passcodeAuthenticator) OtpBarcode(request *restful.Request, response *r
 			response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
 			return
 		}
+	}
+	if user.Spec.FAType != iamv1alpha2.FATypeOtp {
+		klog.Error(err)
+		response.WriteHeaderAndEntity(http.StatusBadRequest, "current 2fa type is not otp")
+		return
 	}
 	otpKey, _ := otp.NewKeyFromURL(user.Spec.OTPKey.Orig)
 	//Convert TOTP key into a PNG
