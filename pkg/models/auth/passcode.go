@@ -145,6 +145,7 @@ func (p *passcodeAuthenticator) Authenticate(ctx context.Context, username, pass
 		u.Extra = map[string][]string{
 			iamv1alpha2.ExtraFAOpenStatus: {strconv.FormatBool(user.Spec.FAOpenStatus)},
 			iamv1alpha2.ExtraFAType:       {user.Spec.FAType},
+			iamv1alpha2.ExtraOTPBind:      {strconv.FormatBool(user.Spec.OTPBind)},
 		}
 
 		return u, "", nil

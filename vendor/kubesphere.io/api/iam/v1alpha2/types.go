@@ -72,10 +72,12 @@ const (
 	FieldPhone                            = "phone"
 	FieldFAOpenStatus                     = "faOpenStatus"
 	FieldFAType                           = "faType"
+	FieldOTPBind                          = "0tpBind"
 	ExtraEmail                            = FieldEmail
 	ExtraPhone                            = FieldPhone
 	ExtraFAOpenStatus                     = FieldFAOpenStatus
 	ExtraFAType                           = FieldFAType
+	ExtraOTPBind                          = FieldOTPBind
 	ExtraIdentityProvider                 = "idp"
 	ExtraUID                              = "uid"
 	ExtraUsername                         = "username"
@@ -153,11 +155,11 @@ type UserSpec struct {
 	EncryptedPassword string `json:"password,omitempty"`
 	Phone             string `json:"phone"`
 	// +kubebuilder:default=false
-	FAOpenStatus bool   `json:"faOpenStatus"`
-	FAType       string `json:"faType"`
-	OTPKey   *OtpKey `json:"otpKey"`
-	SMSKey   *OtpKey `json:"smsKey"`
-	OTPBind  bool    `json:"otpBind"`
+	FAOpenStatus bool    `json:"faOpenStatus"`
+	FAType       string  `json:"faType"`
+	OTPKey       *OtpKey `json:"otpKey"`
+	SMSKey       *OtpKey `json:"smsKey"`
+	OTPBind      bool    `json:"otpBind"`
 }
 type OtpKey struct {
 	Orig string  `json:"orig,omitempty"`
