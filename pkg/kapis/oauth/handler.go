@@ -644,7 +644,7 @@ func (h *handler) passcodeGrant(username string, password string, passcode strin
 	extra := authenticated.GetExtra()
 	if value, ok := extra[iamv1alpha2.ExtraFAOpenStatus]; ok {
 		if value[0] == "true" {
-			response.WriteEntity(authenticated)
+			response.WriteHeaderAndEntity(http.StatusOK, authenticated)
 			return
 		}
 	}
