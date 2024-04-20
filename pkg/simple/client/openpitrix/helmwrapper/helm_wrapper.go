@@ -43,7 +43,7 @@ import (
 
 const (
 	workspaceBase = "/tmp/helm-operator"
-	helmPath      = "D:\\Program Files\\helm-v3.14.2-windows-amd64\\windows-amd64\\helm.exe"
+	//helmPath      = "D:\\Program Files\\helm-v3.14.2-windows-amd64\\windows-amd64\\helm.exe"
 )
 
 var (
