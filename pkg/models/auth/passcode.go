@@ -501,6 +501,7 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 	sendUrl := smsSecret.Data["sendUrl"]
 	templateId := smsSecret.Data["templateId"]
 	tokenUrl := smsSecret.Data["tokenUrl"]
+	appName := smsSecret.Data["appName"]
 	// 获取ywxt的access_token
 	res, err := http.Get(string(tokenUrl) + "?corpsecret=" + string(appSecret))
 	if err != nil {
@@ -546,7 +547,7 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		return
 	}
 	// 发送短信
-	postBody := strings.NewReader(`{"smsTemplateCode":"` + string(templateId) + `","phoneNumbers":["` + phone + `"],"paramJson":{"notice": "您的验证码为` + otpstr + `，请于5分钟内正确输入，如非本人操作，请忽略此短信。","appName": "SWIFT云平台"}}`)
+	postBody := strings.NewReader(`{"smsTemplateCode":"` + string(templateId) + `","phoneNumbers":["` + phone + `"],"paramJson":{"notice": "您的验证码为` + otpstr + `，请于5分钟内正确输入，如非本人操作，请忽略此短信。","appName": "` + string(appName) + `"}}`)
 	resp, err := http.Post(
 		string(sendUrl)+"?access_token="+string(accessToken),
 		"application/json",

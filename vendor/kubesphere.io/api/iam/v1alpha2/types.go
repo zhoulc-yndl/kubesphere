@@ -72,7 +72,7 @@ const (
 	FieldPhone                            = "phone"
 	FieldFAOpenStatus                     = "faOpenStatus"
 	FieldFAType                           = "faType"
-	FieldOTPBind                          = "0tpBind"
+	FieldOTPBind                          = "otpBind"
 	ExtraEmail                            = FieldEmail
 	ExtraPhone                            = FieldPhone
 	ExtraFAOpenStatus                     = FieldFAOpenStatus
