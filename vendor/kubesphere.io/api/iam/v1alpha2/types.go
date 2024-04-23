@@ -160,6 +160,7 @@ type UserSpec struct {
 	OTPKey       *OtpKey `json:"otpKey"`
 	SMSKey       *OtpKey `json:"smsKey"`
 	OTPBind      bool    `json:"otpBind"`
+	Issuer       string  `json:"issuer"`
 }
 type OtpKey struct {
 	Orig string  `json:"orig,omitempty"`

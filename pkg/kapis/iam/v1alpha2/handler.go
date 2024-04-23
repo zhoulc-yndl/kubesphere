@@ -17,7 +17,10 @@ limitations under the License.
 package v1alpha2
 
 import (
+	"crypto/rand"
 	"fmt"
+	"github.com/pquerna/otp/totp"
+	"net/url"
 	"strings"
 
 	authuser "k8s.io/apiserver/pkg/authentication/user"
@@ -522,6 +525,110 @@ func (h *iamHandler) CreateUser(req *restful.Request, resp *restful.Response) {
 			return
 		}
 	}
+	// 双因素认证
+	if user.Spec.FAType == iamv1alpha2.FATypeOtp {
+		// 如果不存在OTPKey，则更新
+		if user.Spec.OTPKey == nil || user.Spec.OTPKey.Orig == "" {
+			// 生成 TOTP 密钥配置
+			opts := totp.GenerateOpts{
+				Issuer:      user.Spec.Issuer,
+				AccountName: user.Name,
+				SecretSize:  20,
+			}
+
+			secret := make([]byte, opts.SecretSize)
+			_, err := rand.Reader.Read(secret)
+			if err != nil {
+				panic(err)
+			}
+			opts.Secret = secret
+			key, err := totp.Generate(opts)
+			if err != nil {
+				panic(err)
+			}
+			u, _ := url.Parse(key.String())
+			us := u.User
+			otpUsername := us.Username()
+			otpPassword, otpPasswordSet := us.Password()
+			b := &iamv1alpha2.OtpKey{
+				Orig: key.String(),
+				Url: &iamv1alpha2.OtpURL{
+					Scheme: u.Scheme,
+					Opaque: u.Opaque,
+					User: &iamv1alpha2.OtpUrlUserinfo{
+						Username:    otpUsername,
+						Password:    otpPassword,
+						PasswordSet: otpPasswordSet,
+					},
+					Host:        u.Host,
+					Path:        u.Path,
+					RawPath:     u.RawPath,
+					OmitHost:    u.OmitHost,
+					ForceQuery:  u.ForceQuery,
+					RawQuery:    u.RawQuery,
+					Fragment:    u.Fragment,
+					RawFragment: u.RawFragment,
+				},
+			}
+			user.Spec.OTPKey = b
+		}
+
+		// update user set 2fa open status and otpKey info
+		user.Spec.FAOpenStatus = true
+		user.Spec.FAType = iamv1alpha2.FATypeOtp
+	}
+	if user.Spec.FAType == iamv1alpha2.FATypeSms {
+		if user.Spec.Phone != "" {
+			// 使用otp生成短信验证码
+			if user.Spec.SMSKey == nil || user.Spec.SMSKey.Orig == "" {
+				// 生成 TOTP 密钥配置
+				opts := totp.GenerateOpts{
+					Issuer:      "sms",
+					AccountName: user.Name,
+					SecretSize:  20,
+					Period:      300,
+				}
+
+				secret := make([]byte, opts.SecretSize)
+				_, err := rand.Reader.Read(secret)
+				if err != nil {
+					panic(err)
+				}
+				opts.Secret = secret
+				key, err := totp.Generate(opts)
+				if err != nil {
+					panic(err)
+				}
+				u, _ := url.Parse(key.String())
+				us := u.User
+				otpUsername := us.Username()
+				otpPassword, otpPasswordSet := us.Password()
+				b := &iamv1alpha2.OtpKey{
+					Orig: key.String(),
+					Url: &iamv1alpha2.OtpURL{
+						Scheme: u.Scheme,
+						Opaque: u.Opaque,
+						User: &iamv1alpha2.OtpUrlUserinfo{
+							Username:    otpUsername,
+							Password:    otpPassword,
+							PasswordSet: otpPasswordSet,
+						},
+						Host:        u.Host,
+						Path:        u.Path,
+						RawPath:     u.RawPath,
+						OmitHost:    u.OmitHost,
+						ForceQuery:  u.ForceQuery,
+						RawQuery:    u.RawQuery,
+						Fragment:    u.Fragment,
+						RawFragment: u.RawFragment,
+					},
+				}
+				user.Spec.SMSKey = b
+			}
+			user.Spec.FAOpenStatus = true
+			user.Spec.FAType = iamv1alpha2.FATypeSms
+		}
+	}
 
 	created, err := h.im.CreateUser(&user)
 	if err != nil {
@@ -561,6 +668,117 @@ func (h *iamHandler) UpdateUser(request *restful.Request, response *restful.Resp
 
 	globalRole := user.Annotations[iamv1alpha2.GlobalRoleAnnotation]
 	delete(user.Annotations, iamv1alpha2.GlobalRoleAnnotation)
+
+	// 双因素认证
+	if user.Spec.FAType == iamv1alpha2.FATypeOtp {
+		if user.Spec.Issuer == "" {
+			err := fmt.Errorf("otp issuer is null")
+			api.HandleBadRequest(response, request, err)
+			return
+		}
+		// 如果不存在OTPKey，则更新
+		if user.Spec.OTPKey == nil || user.Spec.OTPKey.Orig == "" {
+			// 生成 TOTP 密钥配置
+			opts := totp.GenerateOpts{
+				Issuer:      user.Spec.Issuer,
+				AccountName: user.Name,
+				SecretSize:  20,
+			}
+
+			secret := make([]byte, opts.SecretSize)
+			_, err := rand.Reader.Read(secret)
+			if err != nil {
+				panic(err)
+			}
+			opts.Secret = secret
+			key, err := totp.Generate(opts)
+			if err != nil {
+				panic(err)
+			}
+			u, _ := url.Parse(key.String())
+			us := u.User
+			otpUsername := us.Username()
+			otpPassword, otpPasswordSet := us.Password()
+			b := &iamv1alpha2.OtpKey{
+				Orig: key.String(),
+				Url: &iamv1alpha2.OtpURL{
+					Scheme: u.Scheme,
+					Opaque: u.Opaque,
+					User: &iamv1alpha2.OtpUrlUserinfo{
+						Username:    otpUsername,
+						Password:    otpPassword,
+						PasswordSet: otpPasswordSet,
+					},
+					Host:        u.Host,
+					Path:        u.Path,
+					RawPath:     u.RawPath,
+					OmitHost:    u.OmitHost,
+					ForceQuery:  u.ForceQuery,
+					RawQuery:    u.RawQuery,
+					Fragment:    u.Fragment,
+					RawFragment: u.RawFragment,
+				},
+			}
+			user.Spec.OTPKey = b
+		}
+
+		// update user set 2fa open status and otpKey info
+		user.Spec.FAOpenStatus = true
+		user.Spec.FAType = iamv1alpha2.FATypeOtp
+	}
+	if user.Spec.FAType == iamv1alpha2.FATypeSms {
+		if user.Spec.Phone != "" {
+			// 使用otp生成短信验证码
+			if user.Spec.SMSKey == nil || user.Spec.SMSKey.Orig == "" {
+				// 生成 TOTP 密钥配置
+				opts := totp.GenerateOpts{
+					Issuer:      "sms",
+					AccountName: user.Name,
+					SecretSize:  20,
+					Period:      300,
+				}
+
+				secret := make([]byte, opts.SecretSize)
+				_, err := rand.Reader.Read(secret)
+				if err != nil {
+					panic(err)
+				}
+				opts.Secret = secret
+				key, err := totp.Generate(opts)
+				if err != nil {
+					panic(err)
+				}
+				u, _ := url.Parse(key.String())
+				us := u.User
+				otpUsername := us.Username()
+				otpPassword, otpPasswordSet := us.Password()
+				b := &iamv1alpha2.OtpKey{
+					Orig: key.String(),
+					Url: &iamv1alpha2.OtpURL{
+						Scheme: u.Scheme,
+						Opaque: u.Opaque,
+						User: &iamv1alpha2.OtpUrlUserinfo{
+							Username:    otpUsername,
+							Password:    otpPassword,
+							PasswordSet: otpPasswordSet,
+						},
+						Host:        u.Host,
+						Path:        u.Path,
+						RawPath:     u.RawPath,
+						OmitHost:    u.OmitHost,
+						ForceQuery:  u.ForceQuery,
+						RawQuery:    u.RawQuery,
+						Fragment:    u.Fragment,
+						RawFragment: u.RawFragment,
+					},
+				}
+				user.Spec.SMSKey = b
+			}
+			user.Spec.FAOpenStatus = true
+			user.Spec.FAType = iamv1alpha2.FATypeSms
+
+		}
+	}
 
 	updated, err := h.im.UpdateUser(&user)
 	if err != nil {
