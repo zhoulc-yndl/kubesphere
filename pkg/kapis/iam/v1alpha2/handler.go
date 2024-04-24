@@ -527,6 +527,11 @@ func (h *iamHandler) CreateUser(req *restful.Request, resp *restful.Response) {
 	}
 	// 双因素认证
 	if user.Spec.FAType == iamv1alpha2.FATypeOtp {
+		if user.Spec.Issuer == "" {
+			err := fmt.Errorf("otp issuer is null")
+			api.HandleBadRequest(resp, req, err)
+			return
+		}
 		// 如果不存在OTPKey，则更新
 		if user.Spec.OTPKey == nil || user.Spec.OTPKey.Orig == "" {
 			// 生成 TOTP 密钥配置
