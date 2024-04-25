@@ -708,23 +708,23 @@ func (h *iamHandler) UpdateUser(request *restful.Request, response *restful.Resp
 			otpUsername := us.Username()
 			otpPassword, otpPasswordSet := us.Password()
 			b := &iamv1alpha2.OtpKey{
-				Orig: key.String(),
+				Orig: b32NoPadding.EncodeToString([]byte(key.String())),
 				Url: &iamv1alpha2.OtpURL{
 					Scheme: u.Scheme,
 					Opaque: u.Opaque,
 					User: &iamv1alpha2.OtpUrlUserinfo{
-						Username:    otpUsername,
-						Password:    otpPassword,
+						Username:    b32NoPadding.EncodeToString([]byte(otpUsername)),
+						Password:    b32NoPadding.EncodeToString([]byte(otpPassword)),
 						PasswordSet: otpPasswordSet,
 					},
-					Host:        u.Host,
-					Path:        u.Path,
-					RawPath:     u.RawPath,
+					Host:        b32NoPadding.EncodeToString([]byte(u.Host)),
+					Path:        b32NoPadding.EncodeToString([]byte(u.Path)),
+					RawPath:     b32NoPadding.EncodeToString([]byte(u.RawPath)),
 					OmitHost:    u.OmitHost,
 					ForceQuery:  u.ForceQuery,
-					RawQuery:    u.RawQuery,
-					Fragment:    u.Fragment,
-					RawFragment: u.RawFragment,
+					RawQuery:    b32NoPadding.EncodeToString([]byte(u.RawQuery)),
+					Fragment:    b32NoPadding.EncodeToString([]byte(u.Fragment)),
+					RawFragment: b32NoPadding.EncodeToString([]byte(u.RawFragment)),
 				},
 			}
 			user.Spec.OTPKey = b
@@ -761,23 +761,23 @@ func (h *iamHandler) UpdateUser(request *restful.Request, response *restful.Resp
 				otpUsername := us.Username()
 				otpPassword, otpPasswordSet := us.Password()
 				b := &iamv1alpha2.OtpKey{
-					Orig: key.String(),
+					Orig: b32NoPadding.EncodeToString([]byte(key.String())),
 					Url: &iamv1alpha2.OtpURL{
 						Scheme: u.Scheme,
 						Opaque: u.Opaque,
 						User: &iamv1alpha2.OtpUrlUserinfo{
-							Username:    otpUsername,
-							Password:    otpPassword,
+							Username:    b32NoPadding.EncodeToString([]byte(otpUsername)),
+							Password:    b32NoPadding.EncodeToString([]byte(otpPassword)),
 							PasswordSet: otpPasswordSet,
 						},
-						Host:        u.Host,
-						Path:        u.Path,
-						RawPath:     u.RawPath,
+						Host:        b32NoPadding.EncodeToString([]byte(u.Host)),
+						Path:        b32NoPadding.EncodeToString([]byte(u.Path)),
+						RawPath:     b32NoPadding.EncodeToString([]byte(u.RawPath)),
 						OmitHost:    u.OmitHost,
 						ForceQuery:  u.ForceQuery,
-						RawQuery:    u.RawQuery,
-						Fragment:    u.Fragment,
-						RawFragment: u.RawFragment,
+						RawQuery:    b32NoPadding.EncodeToString([]byte(u.RawQuery)),
+						Fragment:    b32NoPadding.EncodeToString([]byte(u.Fragment)),
+						RawFragment: b32NoPadding.EncodeToString([]byte(u.RawFragment)),
 					},
 				}
 				user.Spec.SMSKey = b
