@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/base32"
 	"encoding/json"
 	"github.com/emicklei/go-restful"
 	"github.com/pquerna/otp"
@@ -67,6 +68,8 @@ func NewPasscodeAuthenticator(ksClient kubesphere.Interface,
 	}
 	return passcodeAuthenticator
 }
+
+var b32NoPadding = base32.StdEncoding.WithPadding(base32.NoPadding)
 
 func (p *passcodeAuthenticator) Authenticate(ctx context.Context, username, password string, passcode string) (authuser.Info, string, error) {
 	// empty username or password are not allowed
@@ -117,8 +120,7 @@ func (p *passcodeAuthenticator) Authenticate(ctx context.Context, username, pass
 	// kubesphere account
 	user, err := p.userGetter.findUser(username)
 	if err != nil {
-		// ignore not found error
-		if !errors.IsNotFound(err) {
+		if errors.IsNotFound(err) {
 			klog.Error(err)
 			return nil, "", err
 		}
@@ -151,23 +153,28 @@ func (p *passcodeAuthenticator) Authenticate(ctx context.Context, username, pass
 		return u, "", nil
 	}
 	//OTP Verify
-	if user != nil && user.Spec.FAOpenStatus && user.Spec.OTPBind && user.Spec.FAType == iamv1alpha2.FATypeOtp {
-		otpKey, _ := otp.NewKeyFromURL(user.Spec.OTPKey.Orig)
+	if user != nil && user.Spec.FAOpenStatus && user.Spec.FAType == iamv1alpha2.FATypeOtp {
+		orig, _ := b32NoPadding.DecodeString(user.Spec.OTPKey.Orig)
+		otpKey, _ := otp.NewKeyFromURL(string(orig))
 		if user.Spec.OTPKey != nil && !totp.Validate(passcode, otpKey.Secret(), uint(otpKey.Period())) {
 			return nil, "", IncorrectOtpError
 		}
-		// update otp bind status
-		user.Spec.OTPBind = true
-		_, err = p.ksClient.IamV1alpha2().Users().Update(ctx, user, metav1.UpdateOptions{})
-		if err != nil {
-			klog.Error(err)
-			return nil, "", err
+		if !user.Spec.OTPBind {
+			// update otp bind status
+			user.Spec.OTPBind = true
+			_, err = p.ksClient.IamV1alpha2().Users().Update(ctx, user, metav1.UpdateOptions{})
+			if err != nil {
+				klog.Error(err)
+				return nil, "", err
+			}
 		}
+
 	}
 
 	// SMS Verify
 	if user != nil && user.Spec.FAOpenStatus && user.Spec.FAType == iamv1alpha2.FATypeSms {
-		smsKey, _ := otp.NewKeyFromURL(user.Spec.SMSKey.Orig)
+		orig, _ := b32NoPadding.DecodeString(user.Spec.SMSKey.Orig)
+		smsKey, _ := otp.NewKeyFromURL(string(orig))
 		if user.Spec.SMSKey != nil && !totp.Validate(passcode, smsKey.Secret(), uint(smsKey.Period())) {
 			return nil, "", IncorrectSmsError
 		}
@@ -212,8 +219,7 @@ func (p *passcodeAuthenticator) Enable2fa(req *restful.Request, response *restfu
 		// kubesphere account
 		user, err := p.userGetter.findUser(username)
 		if err != nil {
-			// ignore not found error
-			if !errors.IsNotFound(err) {
+			if errors.IsNotFound(err) {
 				klog.Error(err)
 				response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
 				return
@@ -254,23 +260,23 @@ func (p *passcodeAuthenticator) set2faOpen(request *restful.Request, response *r
 			otpUsername := us.Username()
 			otpPassword, otpPasswordSet := us.Password()
 			b := &iamv1alpha2.OtpKey{
-				Orig: key.String(),
+				Orig: b32NoPadding.EncodeToString([]byte(key.String())),
 				Url: &iamv1alpha2.OtpURL{
 					Scheme: u.Scheme,
 					Opaque: u.Opaque,
 					User: &iamv1alpha2.OtpUrlUserinfo{
-						Username:    otpUsername,
-						Password:    otpPassword,
+						Username:    b32NoPadding.EncodeToString([]byte(otpUsername)),
+						Password:    b32NoPadding.EncodeToString([]byte(otpPassword)),
 						PasswordSet: otpPasswordSet,
 					},
-					Host:        u.Host,
-					Path:        u.Path,
-					RawPath:     u.RawPath,
+					Host:        b32NoPadding.EncodeToString([]byte(u.Host)),
+					Path:        b32NoPadding.EncodeToString([]byte(u.Path)),
+					RawPath:     b32NoPadding.EncodeToString([]byte(u.RawPath)),
 					OmitHost:    u.OmitHost,
 					ForceQuery:  u.ForceQuery,
-					RawQuery:    u.RawQuery,
-					Fragment:    u.Fragment,
-					RawFragment: u.RawFragment,
+					RawQuery:    b32NoPadding.EncodeToString([]byte(u.RawQuery)),
+					Fragment:    b32NoPadding.EncodeToString([]byte(u.Fragment)),
+					RawFragment: b32NoPadding.EncodeToString([]byte(u.RawFragment)),
 				},
 			}
 			user.Spec.OTPKey = b
@@ -307,23 +313,23 @@ func (p *passcodeAuthenticator) set2faOpen(request *restful.Request, response *r
 				otpUsername := us.Username()
 				otpPassword, otpPasswordSet := us.Password()
 				b := &iamv1alpha2.OtpKey{
-					Orig: key.String(),
+					Orig: b32NoPadding.EncodeToString([]byte(key.String())),
 					Url: &iamv1alpha2.OtpURL{
 						Scheme: u.Scheme,
 						Opaque: u.Opaque,
 						User: &iamv1alpha2.OtpUrlUserinfo{
-							Username:    otpUsername,
-							Password:    otpPassword,
+							Username:    b32NoPadding.EncodeToString([]byte(otpUsername)),
+							Password:    b32NoPadding.EncodeToString([]byte(otpPassword)),
 							PasswordSet: otpPasswordSet,
 						},
-						Host:        u.Host,
-						Path:        u.Path,
-						RawPath:     u.RawPath,
+						Host:        b32NoPadding.EncodeToString([]byte(u.Host)),
+						Path:        b32NoPadding.EncodeToString([]byte(u.Path)),
+						RawPath:     b32NoPadding.EncodeToString([]byte(u.RawPath)),
 						OmitHost:    u.OmitHost,
 						ForceQuery:  u.ForceQuery,
-						RawQuery:    u.RawQuery,
-						Fragment:    u.Fragment,
-						RawFragment: u.RawFragment,
+						RawQuery:    b32NoPadding.EncodeToString([]byte(u.RawQuery)),
+						Fragment:    b32NoPadding.EncodeToString([]byte(u.Fragment)),
+						RawFragment: b32NoPadding.EncodeToString([]byte(u.RawFragment)),
 					},
 				}
 				user.Spec.SMSKey = b
@@ -364,8 +370,7 @@ func (p *passcodeAuthenticator) Disable2fa(req *restful.Request, response *restf
 		// kubesphere account
 		user, err := p.userGetter.findUser(username)
 		if err != nil {
-			// ignore not found error
-			if !errors.IsNotFound(err) {
+			if errors.IsNotFound(err) {
 				klog.Error(err)
 				response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
 				return
@@ -388,13 +393,14 @@ func (p *passcodeAuthenticator) ResetOTP(req *restful.Request, response *restful
 	// kubesphere account
 	user, err := p.userGetter.findUser(username)
 	if err != nil {
-		// ignore not found error
-		if !errors.IsNotFound(err) {
+
+		if errors.IsNotFound(err) {
 			klog.Error(err)
 			response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
 			return
 		}
 	}
+
 	// 生成 TOTP 密钥配置
 	opts := totp.GenerateOpts{
 		Issuer:      issuer,
@@ -417,23 +423,23 @@ func (p *passcodeAuthenticator) ResetOTP(req *restful.Request, response *restful
 	otpUsername := us.Username()
 	otpPassword, otpPasswordSet := us.Password()
 	b := &iamv1alpha2.OtpKey{
-		Orig: key.String(),
+		Orig: b32NoPadding.EncodeToString([]byte(key.String())),
 		Url: &iamv1alpha2.OtpURL{
 			Scheme: u.Scheme,
 			Opaque: u.Opaque,
 			User: &iamv1alpha2.OtpUrlUserinfo{
-				Username:    otpUsername,
-				Password:    otpPassword,
+				Username:    b32NoPadding.EncodeToString([]byte(otpUsername)),
+				Password:    b32NoPadding.EncodeToString([]byte(otpPassword)),
 				PasswordSet: otpPasswordSet,
 			},
-			Host:        u.Host,
-			Path:        u.Path,
-			RawPath:     u.RawPath,
+			Host:        b32NoPadding.EncodeToString([]byte(u.Host)),
+			Path:        b32NoPadding.EncodeToString([]byte(u.Path)),
+			RawPath:     b32NoPadding.EncodeToString([]byte(u.RawPath)),
 			OmitHost:    u.OmitHost,
 			ForceQuery:  u.ForceQuery,
-			RawQuery:    u.RawQuery,
-			Fragment:    u.Fragment,
-			RawFragment: u.RawFragment,
+			RawQuery:    b32NoPadding.EncodeToString([]byte(u.RawQuery)),
+			Fragment:    b32NoPadding.EncodeToString([]byte(u.Fragment)),
+			RawFragment: b32NoPadding.EncodeToString([]byte(u.RawFragment)),
 		},
 	}
 	user.Spec.OTPKey = b
@@ -455,8 +461,8 @@ func (p *passcodeAuthenticator) OtpBarcode(request *restful.Request, response *r
 	// kubesphere account
 	user, err := p.userGetter.findUser(username)
 	if err != nil {
-		// ignore not found error
-		if !errors.IsNotFound(err) {
+
+		if errors.IsNotFound(err) {
 			klog.Error(err)
 			response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
 			return
@@ -467,7 +473,8 @@ func (p *passcodeAuthenticator) OtpBarcode(request *restful.Request, response *r
 		response.WriteHeaderAndEntity(http.StatusBadRequest, "current 2fa type is not otp")
 		return
 	}
-	otpKey, _ := otp.NewKeyFromURL(user.Spec.OTPKey.Orig)
+	orig, _ := b32NoPadding.DecodeString(user.Spec.OTPKey.Orig)
+	otpKey, _ := otp.NewKeyFromURL(string(orig))
 	//Convert TOTP key into a PNG
 	var buf bytes.Buffer
 	img, err := otpKey.Image(200, 200)
@@ -485,15 +492,17 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 	// kubesphere account
 	user, err := p.userGetter.findUser(username)
 	if err != nil {
-		// ignore not found error
-		if !errors.IsNotFound(err) {
+
+		if errors.IsNotFound(err) {
 			klog.Error(err)
 			response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
 			return
 		}
 	}
+
 	phone := user.Spec.Phone
-	smsKey, _ := otp.NewKeyFromURL(user.Spec.SMSKey.Orig)
+	orig, _ := b32NoPadding.DecodeString(user.Spec.SMSKey.Orig)
+	smsKey, _ := otp.NewKeyFromURL(string(orig))
 	smsOtpSecret := smsKey.Secret()
 	var smsSecret *v1.Secret
 	smsSecret = secret.(*v1.Secret)
@@ -617,8 +626,8 @@ func (p *passcodeAuthenticator) EnableOTP(req *restful.Request, response *restfu
 		// kubesphere account
 		user, err := p.userGetter.findUser(username)
 		if err != nil {
-			// ignore not found error
-			if !errors.IsNotFound(err) {
+
+			if errors.IsNotFound(err) {
 				klog.Error(err)
 				response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
 				return
@@ -709,8 +718,7 @@ func (p *passcodeAuthenticator) EnableSMS(request *restful.Request, response *re
 		// kubesphere account
 		user, err := p.userGetter.findUser(username)
 		if err != nil {
-			// ignore not found error
-			if !errors.IsNotFound(err) {
+			if errors.IsNotFound(err) {
 				klog.Error(err)
 				response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
 				return
