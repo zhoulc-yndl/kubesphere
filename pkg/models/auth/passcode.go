@@ -23,13 +23,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base32"
-	"encoding/json"
+	"fmt"
 	"github.com/emicklei/go-restful"
+	gosms "github.com/pkg6/go-sms"
+	"github.com/pkg6/go-sms/gateways/ywxt"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/hotp"
 	"github.com/pquerna/otp/totp"
 	"image/png"
-	"io"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +49,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -500,50 +500,17 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		}
 	}
 
-	phone := user.Spec.Phone
+	phone, err := strconv.Atoi(user.Spec.Phone)
+	if err != nil {
+		log.Fatal(err)
+		response.WriteHeaderAndEntity(http.StatusBadRequest, "invalid phone number")
+		return
+	}
 	orig, _ := b32NoPadding.DecodeString(user.Spec.SMSKey.Orig)
 	smsKey, _ := otp.NewKeyFromURL(string(orig))
 	smsOtpSecret := smsKey.Secret()
 	var smsSecret *v1.Secret
 	smsSecret = secret.(*v1.Secret)
-	appSecret := smsSecret.Data["Secret"]
-	sendUrl := smsSecret.Data["sendUrl"]
-	templateId := smsSecret.Data["templateId"]
-	tokenUrl := smsSecret.Data["tokenUrl"]
-	appName := smsSecret.Data["appName"]
-	// 获取ywxt的access_token
-	res, err := http.Get(string(tokenUrl) + "?corpsecret=" + string(appSecret))
-	if err != nil {
-		log.Fatal(err)
-		response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
-		return
-	}
-	body, err := io.ReadAll(res.Body)
-	res.Body.Close()
-	if res.StatusCode > 299 {
-		response.WriteHeaderAndEntity(res.StatusCode, body)
-		return
-	}
-	if err != nil {
-		log.Fatal(err)
-		response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
-		return
-	}
-	var result map[string]interface{}
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		log.Fatal(err)
-	}
-	errCode, ok := result["errcode"].(float64)
-	if errCode != 0 {
-		response.WriteHeaderAndEntity(http.StatusBadRequest, result["errmsg"])
-		return
-	}
-	accessToken, ok := result["access_token"].(string)
-	if !ok {
-		response.WriteHeaderAndEntity(http.StatusBadRequest, "get access_token error")
-		return
-	}
 	// 使用otp生成验证码，300s有效期
 	t := time.Now().UTC()
 	counter := int64(math.Floor(float64(t.Unix()) / float64(300)))
@@ -551,37 +518,51 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		Digits:    otp.DigitsSix,
 		Algorithm: otp.AlgorithmSHA1,
 	})
-	if err != nil {
-		response.WriteHeaderAndEntity(http.StatusBadRequest, "sms passcode genera error")
+	smsServiceProvider := string(smsSecret.Data["serviceProvider"])
+	switch smsServiceProvider {
+	case "ywxt":
+		appSecret := smsSecret.Data["Secret"]
+		sendUrl := smsSecret.Data["sendUrl"]
+		templateId := smsSecret.Data["templateId"]
+		tokenUrl := smsSecret.Data["tokenUrl"]
+		appName := smsSecret.Data["appName"]
+		smsHost := smsSecret.Data["host"]
+		notice := smsSecret.Data["notice"]
+
+		var number = gosms.NoCodePhoneNumber(phone)
+		var gateway = ywxt.GateWay(string(appName), string(appSecret), string(smsHost), string(sendUrl), string(tokenUrl))
+
+		var message = gosms.MessageTemplate(string(templateId), gosms.MapStrings{
+			"notice": fmt.Sprintf(string(notice), otpstr),
+			//"notice": fmt.Sprintf("您的验证码为：%s，请于5分钟内正确输入，如非本人操作，请忽略此短信", otpstr),
+		})
+		result, err := gosms.Sender(number, message, gateway)
+		resp, ok := result.ClientResult.Response.(ywxt.Response)
+		if !ok {
+			log.Fatal(err)
+			response.WriteHeaderAndEntity(http.StatusBadRequest, resp.Msg)
+			return
+		}
+		response.WriteHeaderAndEntity(http.StatusOK, resp)
+	//	互亿无线
+	case "ihuiyi":
+	//	阿里云
+	case "aliyun":
+	//	聚合数据
+	case "juhe":
+	//	微网通联
+	case "lmobile":
+	//	短信宝
+	case "smsbao":
+	//	twilio
+	case "twilio":
+	//	网易云信
+	case "yunxin":
+	default:
+		response.WriteHeaderAndEntity(http.StatusBadRequest, fmt.Sprintf("serviceProvider:%v not supported", smsServiceProvider))
 		return
 	}
-	// 发送短信
-	postBody := strings.NewReader(`{"smsTemplateCode":"` + string(templateId) + `","phoneNumbers":["` + phone + `"],"paramJson":{"notice": "您的验证码为` + otpstr + `，请于5分钟内正确输入，如非本人操作，请忽略此短信。","appName": "` + string(appName) + `"}}`)
-	resp, err := http.Post(
-		string(sendUrl)+"?access_token="+string(accessToken),
-		"application/json",
-		postBody,
-	)
-	if err != nil {
-		response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
-		return
-	}
-	defer resp.Body.Close()
 
-	// 读取响应体
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	// 打印响应
-	println(string(respBody))
-	var sendRes map[string]interface{}
-	err = json.Unmarshal(respBody, &sendRes)
-	if err != nil {
-		log.Fatal(err)
-	}
-	response.WriteHeaderAndEntity(http.StatusOK, sendRes)
 }
 
 // IsAdmin 检查用户是否是管理员的函数
@@ -667,23 +648,23 @@ func (p *passcodeAuthenticator) setOtpOpen(request *restful.Request, response *r
 		otpUsername := us.Username()
 		otpPassword, otpPasswordSet := us.Password()
 		b := &iamv1alpha2.OtpKey{
-			Orig: key.String(),
+			Orig: b32NoPadding.EncodeToString([]byte(key.String())),
 			Url: &iamv1alpha2.OtpURL{
 				Scheme: u.Scheme,
 				Opaque: u.Opaque,
 				User: &iamv1alpha2.OtpUrlUserinfo{
-					Username:    otpUsername,
-					Password:    otpPassword,
+					Username:    b32NoPadding.EncodeToString([]byte(otpUsername)),
+					Password:    b32NoPadding.EncodeToString([]byte(otpPassword)),
 					PasswordSet: otpPasswordSet,
 				},
-				Host:        u.Host,
-				Path:        u.Path,
-				RawPath:     u.RawPath,
+				Host:        b32NoPadding.EncodeToString([]byte(u.Host)),
+				Path:        b32NoPadding.EncodeToString([]byte(u.Path)),
+				RawPath:     b32NoPadding.EncodeToString([]byte(u.RawPath)),
 				OmitHost:    u.OmitHost,
 				ForceQuery:  u.ForceQuery,
-				RawQuery:    u.RawQuery,
-				Fragment:    u.Fragment,
-				RawFragment: u.RawFragment,
+				RawQuery:    b32NoPadding.EncodeToString([]byte(u.RawQuery)),
+				Fragment:    b32NoPadding.EncodeToString([]byte(u.Fragment)),
+				RawFragment: b32NoPadding.EncodeToString([]byte(u.RawFragment)),
 			},
 		}
 		user.Spec.OTPKey = b
@@ -759,23 +740,23 @@ func (p *passcodeAuthenticator) setSmsOpen(request *restful.Request, response *r
 			otpUsername := us.Username()
 			otpPassword, otpPasswordSet := us.Password()
 			b := &iamv1alpha2.OtpKey{
-				Orig: key.String(),
+				Orig: b32NoPadding.EncodeToString([]byte(key.String())),
 				Url: &iamv1alpha2.OtpURL{
 					Scheme: u.Scheme,
 					Opaque: u.Opaque,
 					User: &iamv1alpha2.OtpUrlUserinfo{
-						Username:    otpUsername,
-						Password:    otpPassword,
+						Username:    b32NoPadding.EncodeToString([]byte(otpUsername)),
+						Password:    b32NoPadding.EncodeToString([]byte(otpPassword)),
 						PasswordSet: otpPasswordSet,
 					},
-					Host:        u.Host,
-					Path:        u.Path,
-					RawPath:     u.RawPath,
+					Host:        b32NoPadding.EncodeToString([]byte(u.Host)),
+					Path:        b32NoPadding.EncodeToString([]byte(u.Path)),
+					RawPath:     b32NoPadding.EncodeToString([]byte(u.RawPath)),
 					OmitHost:    u.OmitHost,
 					ForceQuery:  u.ForceQuery,
-					RawQuery:    u.RawQuery,
-					Fragment:    u.Fragment,
-					RawFragment: u.RawFragment,
+					RawQuery:    b32NoPadding.EncodeToString([]byte(u.RawQuery)),
+					Fragment:    b32NoPadding.EncodeToString([]byte(u.Fragment)),
+					RawFragment: b32NoPadding.EncodeToString([]byte(u.RawFragment)),
 				},
 			}
 			user.Spec.SMSKey = b
