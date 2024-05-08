@@ -512,7 +512,11 @@ func (h *handler) sendMessage(req *restful.Request, response *restful.Response) 
 		api.HandleBadRequest(response, req, err)
 		return
 	}
-	secret, _ := h.resourceGetterV1alpha3.Get("secrets", "default", "global-sms-config-secret")
+	secret, err := h.resourceGetterV1alpha3.Get("secrets", "default", "global-sms-config-secret")
+	if err != nil {
+		api.HandleBadRequest(response, req, err)
+		return
+	}
 	h.passcodeAuthenticator.SendMessage(req, response, loginRequest.Username, secret)
 }
 

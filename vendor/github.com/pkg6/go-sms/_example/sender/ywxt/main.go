@@ -7,12 +7,22 @@ import (
 )
 
 func main() {
-	var number = gosms.NoCodePhoneNumber(18817384537)
-	var gateway = ywxt.GateWay("CWIFT云平台", "aa86d7ad79e44649adef272cd7132358")
-	var message = gosms.MessageTemplate("1004", gosms.MapStrings{
-		//sendCode 或 verifyCode
-		"action": "sendCode",
-		"notice": "您的验证码为345678，请于5分钟内正确输入，如非本人操作，请忽略此短信",
+	appSecret := "Secret"
+	sendUrl := "sendUrl"
+	templateId := "templateId"
+	tokenUrl := "tokenUrl"
+	appName := "appName"
+	smsHost := "host"
+	notice := "notice"
+	phone := 18888888888
+	otpstr := "127892"
+
+	var number = gosms.NoCodePhoneNumber(phone)
+	var gateway = ywxt.GateWay(string(appName), string(appSecret), string(smsHost), string(sendUrl), string(tokenUrl))
+
+	var message = gosms.MessageTemplate(string(templateId), gosms.MapStrings{
+		"notice": fmt.Sprintf(string(notice), otpstr),
+		//"notice": fmt.Sprintf("您的验证码为：%s，请于5分钟内正确输入，如非本人操作，请忽略此短信", otpstr),
 	})
 	result, err := gosms.Sender(number, message, gateway)
 	if resp, ok := result.ClientResult.Response.(ywxt.Response); ok {
