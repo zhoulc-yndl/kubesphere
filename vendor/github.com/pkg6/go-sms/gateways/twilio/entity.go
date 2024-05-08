@@ -1,6 +1,5 @@
 package twilio
 
-// {"code":20003,"message":"Authentication Error - invalid username","more_info":"https://www.twilio.com/docs/errors/20003","status":401}
 
 type Response struct {
 	Code                int         `json:"code"`
