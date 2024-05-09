@@ -392,7 +392,10 @@ func (p *passcodeAuthenticator) Disable2fa(req *restful.Request, response *restf
 			}
 		}
 	}
-	response.WriteHeaderAndEntity(http.StatusOK, "ok")
+	ok := map[string]string{
+		"Msg": "ok",
+	}
+	response.WriteHeaderAndEntity(http.StatusOK, ok)
 }
 
 func (p *passcodeAuthenticator) ResetOTP(req *restful.Request, response *restful.Response, username, issuer string) {
@@ -459,7 +462,10 @@ func (p *passcodeAuthenticator) ResetOTP(req *restful.Request, response *restful
 		response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
 		return
 	}
-	response.WriteHeaderAndEntity(http.StatusOK, "ok")
+	ok := map[string]string{
+		"Msg": "ok",
+	}
+	response.WriteHeaderAndEntity(http.StatusOK, ok)
 }
 
 func (p *passcodeAuthenticator) OtpBarcode(request *restful.Request, response *restful.Response, username string) {
