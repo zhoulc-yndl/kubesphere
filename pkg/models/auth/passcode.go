@@ -26,6 +26,12 @@ import (
 	"fmt"
 	"github.com/emicklei/go-restful"
 	gosms "github.com/pkg6/go-sms"
+	"github.com/pkg6/go-sms/gateways/aliyun"
+	"github.com/pkg6/go-sms/gateways/ihuyi"
+	"github.com/pkg6/go-sms/gateways/juhe"
+	"github.com/pkg6/go-sms/gateways/lmobile"
+	"github.com/pkg6/go-sms/gateways/smsbao"
+	"github.com/pkg6/go-sms/gateways/yunxin"
 	"github.com/pkg6/go-sms/gateways/ywxt"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/hotp"
@@ -546,18 +552,110 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		response.WriteHeaderAndEntity(http.StatusOK, resp)
 	//	互亿无线
 	case "ihuiyi":
+		account := string(smsSecret.Data["account"])
+		password := string(smsSecret.Data["password"])
+		notice := string(smsSecret.Data["notice"])
+		var number = gosms.NoCodePhoneNumber(phone)
+		var gateway = ihuyi.GateWay(account, password)
+		//var message = gosms.MessageContent("您的验证码是：****。请不要把验证码泄露给其他人。")
+		var message = gosms.MessageContent(fmt.Sprintf(notice, otpstr))
+		result, err := gosms.Sender(number, message, gateway)
+		resp, ok := result.ClientResult.Response.(ihuyi.Response)
+		if !ok {
+			log.Fatal(err)
+			response.WriteHeaderAndEntity(http.StatusBadRequest, resp.Msg)
+			return
+		}
+		response.WriteHeaderAndEntity(http.StatusOK, resp)
 	//	阿里云
 	case "aliyun":
+		accessKeyId := string(smsSecret.Data["accessKeyId"])
+		accessKeySecret := string(smsSecret.Data["accessKeySecret"])
+		notice := string(smsSecret.Data["notice"])
+		var number = gosms.NoCodePhoneNumber(phone)
+		var gateway = aliyun.GateWay(accessKeyId, accessKeySecret)
+		//var message = gosms.MessageContent("您的验证码是：****。请不要把验证码泄露给其他人。")
+		var message = gosms.MessageContent(fmt.Sprintf(notice, otpstr))
+		result, err := gosms.Sender(number, message, gateway)
+		resp, ok := result.ClientResult.Response.(aliyun.Response)
+		if !ok {
+			log.Fatal(err)
+			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
+			return
+		}
+		response.WriteHeaderAndEntity(http.StatusOK, resp)
 	//	聚合数据
 	case "juhe":
+		key := string(smsSecret.Data["key"])
+		templateId := string(smsSecret.Data["templateId"])
+		var number = gosms.NoCodePhoneNumber(phone)
+		var gateway = juhe.GateWay(key)
+		var message = gosms.MessageTemplate(templateId, gosms.MapStrings{
+			"code": otpstr,
+		})
+		result, err := gosms.Sender(number, message, gateway)
+		resp, ok := result.ClientResult.Response.(juhe.Response)
+		if !ok {
+			log.Fatal(err)
+			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
+			return
+		}
+		response.WriteHeaderAndEntity(http.StatusOK, resp)
 	//	微网通联
 	case "lmobile":
+		account := string(smsSecret.Data["account"])
+		password := string(smsSecret.Data["password"])
+		productId := string(smsSecret.Data["productId"])
+		notice := string(smsSecret.Data["notice"])
+		var number = gosms.NoCodePhoneNumber(phone)
+		var gateway = lmobile.GateWay(account, password, productId)
+		//var message = gosms.MessageContent("您的验证码是：****。请不要把验证码泄露给其他人。")
+		var message = gosms.MessageContent(fmt.Sprintf(notice, otpstr))
+		result, err := gosms.Sender(number, message, gateway)
+		resp, ok := result.ClientResult.Response.(lmobile.Response)
+		if !ok {
+			log.Fatal(err)
+			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
+			return
+		}
+		response.WriteHeaderAndEntity(http.StatusOK, resp)
 	//	短信宝
 	case "smsbao":
-	//	twilio
-	case "twilio":
+		account := string(smsSecret.Data["account"])
+		password := string(smsSecret.Data["password"])
+		notice := string(smsSecret.Data["notice"])
+		var number = gosms.NoCodePhoneNumber(phone)
+		var gateway = smsbao.GateWay(account, password)
+		//var message = gosms.MessageContent("您的验证码是：****。请不要把验证码泄露给其他人。")
+		var message = gosms.MessageContent(fmt.Sprintf(notice, otpstr))
+		result, err := gosms.Sender(number, message, gateway)
+		resp, ok := result.ClientResult.Response.(smsbao.Response)
+		if !ok {
+			log.Fatal(err)
+			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
+			return
+		}
+		response.WriteHeaderAndEntity(http.StatusOK, resp)
 	//	网易云信
 	case "yunxin":
+		account := string(smsSecret.Data["account"])
+		password := string(smsSecret.Data["password"])
+		templateId := string(smsSecret.Data["templateId"])
+		var number = gosms.NoCodePhoneNumber(phone)
+		var gateway = yunxin.GateWay(account, password)
+		//var message = gosms.MessageContent("您的验证码是：****。请不要把验证码泄露给其他人。")
+		var message = gosms.MessageTemplate(templateId, gosms.MapStrings{
+			"code":   otpstr,
+			"action": "sendCode",
+		})
+		result, err := gosms.Sender(number, message, gateway)
+		resp, ok := result.ClientResult.Response.(yunxin.Response)
+		if !ok {
+			log.Fatal(err)
+			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
+			return
+		}
+		response.WriteHeaderAndEntity(http.StatusOK, resp)
 	default:
 		response.WriteHeaderAndEntity(http.StatusBadRequest, fmt.Sprintf("serviceProvider:%v not supported", smsServiceProvider))
 		return
