@@ -221,6 +221,7 @@ func (p *passcodeAuthenticator) Enable2fa(req *restful.Request, response *restfu
 				p.set2faOpen(req, response, item.DeepCopy(), issuer, faType)
 			}
 		}
+
 	} else {
 		// kubesphere account
 		user, err := p.userGetter.findUser(username)
@@ -236,6 +237,10 @@ func (p *passcodeAuthenticator) Enable2fa(req *restful.Request, response *restfu
 		}
 
 	}
+	ok := map[string]string{
+		"Msg": "ok",
+	}
+	response.WriteHeaderAndEntity(http.StatusOK, ok)
 
 }
 
@@ -350,7 +355,7 @@ func (p *passcodeAuthenticator) set2faOpen(request *restful.Request, response *r
 		response.WriteHeaderAndEntity(http.StatusBadRequest, oauth.NewInvalidRequest(err))
 		return
 	}
-	response.WriteHeaderAndEntity(http.StatusOK, "ok")
+
 }
 
 func (p *passcodeAuthenticator) Disable2fa(req *restful.Request, response *restful.Response, username, global string) {
@@ -723,7 +728,10 @@ func (p *passcodeAuthenticator) EnableOTP(req *restful.Request, response *restfu
 		}
 
 	}
-
+	ok := map[string]string{
+		"Msg": "ok",
+	}
+	response.WriteHeaderAndEntity(http.StatusOK, ok)
 }
 
 func (p *passcodeAuthenticator) setOtpOpen(request *restful.Request, response *restful.Response, user *iamv1alpha2.User, issuer string) {
@@ -814,7 +822,10 @@ func (p *passcodeAuthenticator) EnableSMS(request *restful.Request, response *re
 		}
 
 	}
-
+	ok := map[string]string{
+		"Msg": "ok",
+	}
+	response.WriteHeaderAndEntity(http.StatusOK, ok)
 }
 
 func (p *passcodeAuthenticator) setSmsOpen(request *restful.Request, response *restful.Response, user *iamv1alpha2.User) {
