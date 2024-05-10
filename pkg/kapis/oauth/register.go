@@ -162,50 +162,6 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), "").
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
 
-	// enable otp
-	ws.Route(ws.POST("/enable_2fa").
-		Consumes(contentTypeFormData).
-		Param(ws.FormParameter("username", "The otp username.").Required(false)).
-		Param(ws.FormParameter("issuer", "The otp issuer.").Required(false)).
-		Param(ws.FormParameter("global", "The otp global flag.").Required(true)).
-		Param(ws.FormParameter("faType", "The 2fa type.").Required(true)).
-		To(handler.enable2fa).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
-		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
-
-	// reset otp
-	ws.Route(ws.POST("/reset_otp").
-		Consumes(contentTypeFormData).
-		Param(ws.FormParameter("username", "The otp username.").Required(true)).
-		Param(ws.FormParameter("issuer", "The otp issuer.").Required(true)).
-		To(handler.resetOtp).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
-		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
-
-	// disable otp
-	ws.Route(ws.POST("/disable_2fa").
-		Consumes(contentTypeFormData).
-		Param(ws.FormParameter("username", "The otp username.").Required(false)).
-		Param(ws.FormParameter("global", "The otp global flag.").Required(true)).
-		To(handler.disable2fa).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
-		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
-
-	// get otp png
-	ws.Route(ws.GET("/otp/barcode").
-		Consumes(contentTypeFormData).
-		Param(ws.FormParameter("username", "The otp username.").Required(true)).
-		To(handler.otpBarcode).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
-		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
-
-	//ws.Route(ws.GET("/sms/send").
-	//	Consumes(contentTypeFormData).
-	//	Param(ws.FormParameter("username", "The otp username.").Required(true)).
-	//	To(handler.sendMessage).
-	//	Returns(http.StatusOK, http.StatusText(http.StatusOK), &oauth.Token{}).
-	//	Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
-
 	c.Add(ws)
 	// legacy auth API
 	legacy := &restful.WebService{}
@@ -216,14 +172,6 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 		To(handler.login).
 		Deprecate().
 		Doc("KubeSphere APIs support token-based authentication via the Authtoken request header. The POST Login API is used to retrieve the authentication token. After the authentication token is obtained, it must be inserted into the Authtoken header for all requests.").
-		Reads(LoginRequest{}).
-		Returns(http.StatusOK, api.StatusOK, oauth.Token{}).
-		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
-
-	legacy.Route(legacy.POST("/sms/send").
-		To(handler.sendMessage).
-		Deprecate().
-		Doc("send sms passcode").
 		Reads(LoginRequest{}).
 		Returns(http.StatusOK, api.StatusOK, oauth.Token{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))

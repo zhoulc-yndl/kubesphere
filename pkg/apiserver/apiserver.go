@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	multauth "kubesphere.io/kubesphere/pkg/kapis/multiauth"
 	"kubesphere.io/kubesphere/pkg/models/resources/v1alpha3/resource"
 	"net/http"
 	rt "runtime"
@@ -258,6 +259,10 @@ func (s *APIServer) installKubeSphereAPIs(stopCh <-chan struct{}) {
 		auth.NewOAuthAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions),
 		auth.NewLoginRecorder(s.KubernetesClient.KubeSphere(), userLister),
 		s.Config.AuthenticationOptions,
+		auth.NewPasscodeAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions),
+		resource.NewResourceGetter(s.InformerFactory, s.RuntimeCache),
+	))
+	urlruntime.Must(multauth.AddToContainer(s.container, imOperator,
 		auth.NewPasscodeAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions),
 		resource.NewResourceGetter(s.InformerFactory, s.RuntimeCache),
 	))
