@@ -500,12 +500,8 @@ func (p *passcodeAuthenticator) OtpBarcode(request *restful.Request, response *r
 	}
 	png.Encode(&buf, img)
 
-	//response.Header().Set("Content-Type", "image/png")
-	//response.Write(buf.Bytes())
-	ok := map[string]string{
-		"image": string(buf.Bytes()),
-	}
-	response.WriteHeaderAndEntity(http.StatusOK, ok)
+	response.Header().Set("Content-Type", "image/png")
+	response.Write(buf.Bytes())
 }
 
 func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *restful.Response, username string, secret runtime.Object) {
