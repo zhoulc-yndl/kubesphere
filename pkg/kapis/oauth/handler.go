@@ -422,9 +422,9 @@ func (h *handler) token(req *restful.Request, response *restful.Response) {
 	case grantTypePassword:
 		username, _ := req.BodyParameter("username")
 		password, _ := req.BodyParameter("password")
-		//passcode, _ := req.BodyParameter("passcode")
-		h.passwordGrant(username, password, req, response)
-		//h.passcodeGrant(username, password, passcode, req, response)
+		passcode, _ := req.BodyParameter("passcode")
+		//h.passwordGrant(username, password, req, response)
+		h.passcodeGrant(username, password, passcode, req, response)
 		return
 	case grantTypeRefreshToken:
 		h.refreshTokenGrant(req, response)
