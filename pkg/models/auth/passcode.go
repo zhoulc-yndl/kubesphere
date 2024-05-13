@@ -44,6 +44,7 @@ import (
 	authuser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/klog"
 	iamv1alpha2 "kubesphere.io/api/iam/v1alpha2"
+	"kubesphere.io/kubesphere/pkg/api"
 	"kubesphere.io/kubesphere/pkg/apiserver/authentication"
 	"kubesphere.io/kubesphere/pkg/apiserver/authentication/identityprovider"
 	"kubesphere.io/kubesphere/pkg/apiserver/authentication/oauth"
@@ -249,6 +250,11 @@ func (p *passcodeAuthenticator) set2faOpen(request *restful.Request, response *r
 	if faType == iamv1alpha2.FATypeOtp {
 		// 如果不存在OTPKey，则更新
 		if user.Spec.OTPKey == nil || user.Spec.OTPKey.Orig == "" {
+			if issuer == "" {
+				err := fmt.Errorf("otp issuer is null")
+				api.HandleBadRequest(response, request, err)
+				return
+			}
 			// 生成 TOTP 密钥配置
 			opts := totp.GenerateOpts{
 				Issuer:      issuer,
@@ -296,6 +302,7 @@ func (p *passcodeAuthenticator) set2faOpen(request *restful.Request, response *r
 		// update user set 2fa open status and otpKey info
 		user.Spec.FAOpenStatus = true
 		user.Spec.FAType = iamv1alpha2.FATypeOtp
+		user.Spec.Issuer = issuer
 	}
 	if faType == iamv1alpha2.FATypeSms {
 		if user.Spec.Phone != "" {
