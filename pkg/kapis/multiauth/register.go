@@ -81,6 +81,7 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 	// get otp png
 	ws.Route(ws.GET("/otp/barcode").
 		Consumes(contentTypeFormData).
+		Deprecate().
 		Param(ws.FormParameter("username", "The otp username.").Required(true)).
 		To(handler.otpBarcode).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), "").
