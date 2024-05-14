@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	"kubesphere.io/kubesphere/pkg/simple/client/multiauth"
 	"reflect"
 	"strings"
 	"sync"
@@ -179,6 +180,7 @@ type Config struct {
 	GatewayOptions        *gateway.Options        `json:"gateway,omitempty" yaml:"gateway,omitempty" mapstructure:"gateway"`
 	GPUOptions            *gpu.Options            `json:"gpu,omitempty" yaml:"gpu,omitempty" mapstructure:"gpu"`
 	TerminalOptions       *terminal.Options       `json:"terminal,omitempty" yaml:"terminal,omitempty" mapstructure:"terminal"`
+	MultiauthOptions      *multiauth.Options      `json:"multauth,omitempty" yaml:"multauth,omitempty" mapstructure:"multauth"`
 }
 
 // newConfig creates a default non-empty Config
@@ -208,6 +210,7 @@ func New() *Config {
 		GatewayOptions:        gateway.NewGatewayOptions(),
 		GPUOptions:            gpu.NewGPUOptions(),
 		TerminalOptions:       terminal.NewTerminalOptions(),
+		MultiauthOptions:      multiauth.NewOptions(),
 	}
 }
 
@@ -362,6 +365,9 @@ func (conf *Config) stripEmptyOptions() {
 
 	if conf.GPUOptions != nil && len(conf.GPUOptions.Kinds) == 0 {
 		conf.GPUOptions = nil
+	}
+	if conf.MultiauthOptions != nil && !conf.MultiauthOptions.FAOpenStatus {
+		conf.MultiauthOptions = nil
 	}
 }
 
