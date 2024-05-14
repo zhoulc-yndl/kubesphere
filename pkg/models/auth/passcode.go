@@ -36,21 +36,25 @@ import (
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/hotp"
 	"github.com/pquerna/otp/totp"
+	"gopkg.in/yaml.v2"
 	"image/png"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	authuser "k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	iamv1alpha2 "kubesphere.io/api/iam/v1alpha2"
 	"kubesphere.io/kubesphere/pkg/api"
 	"kubesphere.io/kubesphere/pkg/apiserver/authentication"
 	"kubesphere.io/kubesphere/pkg/apiserver/authentication/identityprovider"
 	"kubesphere.io/kubesphere/pkg/apiserver/authentication/oauth"
+	"kubesphere.io/kubesphere/pkg/apiserver/config"
 	kubesphere "kubesphere.io/kubesphere/pkg/client/clientset/versioned"
 	iamv1alpha2listers "kubesphere.io/kubesphere/pkg/client/listers/iam/v1alpha2"
 	"kubesphere.io/kubesphere/pkg/constants"
+	"kubesphere.io/kubesphere/pkg/simple/client/multiauth"
 	"log"
 	"math"
 	"net/http"
@@ -63,15 +67,18 @@ type passcodeAuthenticator struct {
 	ksClient    kubesphere.Interface
 	userGetter  *userGetter
 	authOptions *authentication.Options
+	k8sClient   kubernetes.Interface
 }
 
 func NewPasscodeAuthenticator(ksClient kubesphere.Interface,
 	userLister iamv1alpha2listers.UserLister,
-	options *authentication.Options) PasscodeAuthenticator {
+	options *authentication.Options,
+	k8sClient kubernetes.Interface) PasscodeAuthenticator {
 	passcodeAuthenticator := &passcodeAuthenticator{
 		ksClient:    ksClient,
 		userGetter:  &userGetter{userLister: userLister},
 		authOptions: options,
+		k8sClient:   k8sClient,
 	}
 	return passcodeAuthenticator
 }
@@ -213,6 +220,40 @@ func (p *passcodeAuthenticator) Enable2fa(req *restful.Request, response *restfu
 
 	// global set
 	if global == "true" {
+		cm, err := p.k8sClient.CoreV1().ConfigMaps(constants.KubeSphereNamespace).Get(context.TODO(), constants.KubeSphereMultauthConfigName, metav1.GetOptions{})
+		if err != nil {
+			klog.Error(err)
+		}
+
+		configData := &config.Config{}
+		value, ok := cm.Data[constants.KubeSphereMultauthConfigMapDataKey]
+		if !ok {
+			klog.Error(fmt.Errorf("failed to get configmap multauth-config.yaml value"))
+			response.WriteHeaderAndEntity(http.StatusBadRequest, fmt.Errorf("failed to get configmap multauth-config.yaml value"))
+			return
+		}
+		if err := yaml.Unmarshal([]byte(value), configData); err != nil {
+			klog.Error(fmt.Errorf("failed to unmarshal value from configmap. err: %s", err))
+			response.WriteHeaderAndEntity(http.StatusBadRequest, fmt.Errorf("failed to unmarshal value from configmap. err: %s", err))
+			return
+		}
+
+		if err != nil {
+			klog.Error(err)
+		}
+		if configData.MultiauthOptions == nil {
+			configData.MultiauthOptions = &multiauth.Options{}
+		}
+		configData.MultiauthOptions.FAOpenStatus = true
+		configData.MultiauthOptions.FAType = faType
+		configData.MultiauthOptions.Issuer = issuer
+
+		newConfigData, err := yaml.Marshal(configData)
+		if err != nil {
+			klog.Error(err)
+		}
+		cm.Data[constants.KubeSphereMultauthConfigMapDataKey] = string(newConfigData)
+		p.k8sClient.CoreV1().ConfigMaps(constants.KubeSphereNamespace).Update(req.Request.Context(), cm, metav1.UpdateOptions{})
 		userList, err := p.ksClient.IamV1alpha2().Users().List(req.Request.Context(), metav1.ListOptions{})
 		if err != nil {
 			klog.Error(err)
@@ -369,6 +410,38 @@ func (p *passcodeAuthenticator) Disable2fa(req *restful.Request, response *restf
 
 	// global set
 	if global == "true" {
+		cm, err := p.k8sClient.CoreV1().ConfigMaps(constants.KubeSphereNamespace).Get(context.TODO(), constants.KubeSphereMultauthConfigName, metav1.GetOptions{})
+		if err != nil {
+			klog.Error(err)
+		}
+
+		configData := &config.Config{}
+		value, ok := cm.Data[constants.KubeSphereMultauthConfigMapDataKey]
+		if !ok {
+			klog.Error(fmt.Errorf("failed to get configmap multauth-config.yaml value"))
+			response.WriteHeaderAndEntity(http.StatusBadRequest, fmt.Errorf("failed to get configmap multauth-config.yaml value"))
+			return
+		}
+		if err := yaml.Unmarshal([]byte(value), configData); err != nil {
+			klog.Error(fmt.Errorf("failed to unmarshal value from configmap. err: %s", err))
+			response.WriteHeaderAndEntity(http.StatusBadRequest, fmt.Errorf("failed to unmarshal value from configmap. err: %s", err))
+			return
+		}
+
+		if err != nil {
+			klog.Error(err)
+		}
+		if configData.MultiauthOptions == nil {
+			configData.MultiauthOptions = &multiauth.Options{}
+		}
+		configData.MultiauthOptions.FAOpenStatus = false
+
+		newConfigData, err := yaml.Marshal(configData)
+		if err != nil {
+			klog.Error(err)
+		}
+		cm.Data[constants.KubeSphereMultauthConfigMapDataKey] = string(newConfigData)
+		p.k8sClient.CoreV1().ConfigMaps(constants.KubeSphereNamespace).Update(req.Request.Context(), cm, metav1.UpdateOptions{})
 		userList, err := p.ksClient.IamV1alpha2().Users().List(req.Request.Context(), metav1.ListOptions{})
 		if err != nil {
 			klog.Error(err)
@@ -892,4 +965,36 @@ func (p *passcodeAuthenticator) setSmsOpen(request *restful.Request, response *r
 			return
 		}
 	}
+}
+func (p *passcodeAuthenticator) Get2faConfig(request *restful.Request, response *restful.Response) {
+	cm, err := p.k8sClient.CoreV1().ConfigMaps(constants.KubeSphereNamespace).Get(context.TODO(), constants.KubeSphereMultauthConfigName, metav1.GetOptions{})
+	if err != nil {
+		klog.Error(err)
+	}
+	configData := &config.Config{}
+	value, ok := cm.Data[constants.KubeSphereMultauthConfigMapDataKey]
+	if !ok {
+		klog.Error(fmt.Errorf("failed to get configmap multauth-config.yaml value"))
+		response.WriteHeaderAndEntity(http.StatusBadRequest, fmt.Errorf("failed to get configmap multauth-config.yaml value"))
+		return
+	}
+	if err := yaml.Unmarshal([]byte(value), configData); err != nil {
+		klog.Error(fmt.Errorf("failed to unmarshal value from configmap. err: %s", err))
+		response.WriteHeaderAndEntity(http.StatusBadRequest, fmt.Errorf("failed to unmarshal value from configmap. err: %s", err))
+		return
+	}
+
+	if err != nil {
+		klog.Error(err)
+	}
+	if configData.MultiauthOptions == nil {
+		configData.MultiauthOptions = &multiauth.Options{}
+	}
+
+	res := map[string]string{
+		"faOpenStatus": fmt.Sprintf("%t", configData.MultiauthOptions.FAOpenStatus),
+		"faType":       configData.MultiauthOptions.FAType,
+		"issuer":       configData.MultiauthOptions.Issuer,
+	}
+	response.WriteHeaderAndEntity(http.StatusOK, res)
 }

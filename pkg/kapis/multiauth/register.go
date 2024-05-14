@@ -78,6 +78,14 @@ func AddToContainer(c *restful.Container, im im.IdentityManagementInterface,
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), "").
 		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
 
+	// get 2fa config
+	ws.Route(ws.GET("/get_2fa_config").
+		To(handler.get2faConfig).
+		Doc("get 2fa config").
+		Reads(LoginRequest{}).
+		Returns(http.StatusOK, api.StatusOK, "").
+		Metadata(restfulspec.KeyOpenAPITags, []string{constants.AuthenticationTag}))
+
 	// get otp png
 	ws.Route(ws.GET("/otp/barcode").
 		To(handler.otpBarcode).

@@ -259,11 +259,11 @@ func (s *APIServer) installKubeSphereAPIs(stopCh <-chan struct{}) {
 		auth.NewOAuthAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions),
 		auth.NewLoginRecorder(s.KubernetesClient.KubeSphere(), userLister),
 		s.Config.AuthenticationOptions,
-		auth.NewPasscodeAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions),
+		auth.NewPasscodeAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions, s.KubernetesClient.Kubernetes()),
 		resource.NewResourceGetter(s.InformerFactory, s.RuntimeCache),
 	))
 	urlruntime.Must(multauth.AddToContainer(s.container, imOperator,
-		auth.NewPasscodeAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions),
+		auth.NewPasscodeAuthenticator(s.KubernetesClient.KubeSphere(), userLister, s.Config.AuthenticationOptions, s.KubernetesClient.Kubernetes()),
 		resource.NewResourceGetter(s.InformerFactory, s.RuntimeCache),
 	))
 	urlruntime.Must(servicemeshv1alpha2.AddToContainer(s.Config.ServiceMeshOptions, s.container, s.KubernetesClient.Kubernetes(), s.CacheClient))

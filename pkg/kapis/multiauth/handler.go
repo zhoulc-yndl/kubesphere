@@ -17,6 +17,7 @@ limitations under the License.
 package multauth
 
 import (
+	"k8s.io/client-go/kubernetes"
 	resourcev1alpha3 "kubesphere.io/kubesphere/pkg/models/resources/v1alpha3/resource"
 	"net/http"
 
@@ -45,6 +46,7 @@ type handler struct {
 	im                     im.IdentityManagementInterface
 	passcodeAuthenticator  auth.PasscodeAuthenticator
 	resourceGetterV1alpha3 *resourcev1alpha3.ResourceGetter
+	k8sClient              kubernetes.Interface
 }
 
 func newHandler(im im.IdentityManagementInterface,
@@ -80,6 +82,7 @@ func (h *handler) enable2fa(req *restful.Request, response *restful.Response) {
 			response.WriteHeaderAndEntity(http.StatusBadRequest, "faType is null")
 			return
 		}
+
 		//else if faType == iamv1alpha2.FATypeOtp {
 		//	if issuer == "" {
 		//		response.WriteHeaderAndEntity(http.StatusBadRequest, "issuer is null")
@@ -138,6 +141,7 @@ func (h *handler) otpBarcode(req *restful.Request, response *restful.Response) {
 	//	response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
 	//	return
 	//}
+
 	username := req.QueryParameter("username")
 	//判断用户角色，普通用户只能获取自己的otp二维码
 	isAdmin := h.passcodeAuthenticator.IsAdmin(username)
@@ -193,4 +197,7 @@ func (h *handler) sendMessage(req *restful.Request, response *restful.Response) 
 		return
 	}
 	h.passcodeAuthenticator.SendMessage(req, response, loginRequest.Username, secret)
+}
+func (h *handler) get2faConfig(req *restful.Request, response *restful.Response) {
+	h.passcodeAuthenticator.Get2faConfig(req, response)
 }

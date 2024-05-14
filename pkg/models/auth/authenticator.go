@@ -65,6 +65,7 @@ type PasscodeAuthenticator interface {
 	SendMessage(req *restful.Request, response *restful.Response, username string, secret runtime.Object)
 	EnableSMS(req *restful.Request, response *restful.Response, username string, global string)
 	IsAdmin(username string) bool
+	Get2faConfig(req *restful.Request, response *restful.Response)
 }
 
 type OAuthAuthenticator interface {
