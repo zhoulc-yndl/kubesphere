@@ -127,29 +127,29 @@ func (h *handler) disable2fa(req *restful.Request, response *restful.Response) {
 }
 
 func (h *handler) otpBarcode(req *restful.Request, response *restful.Response) {
-	// 根据token获取用户信息
-	authenticated, _ := request.UserFrom(req.Request.Context())
-	if authenticated == nil || authenticated.GetName() == user.Anonymous {
-		response.WriteHeaderAndEntity(http.StatusUnauthorized, oauth.ErrorLoginRequired)
-		return
-	}
-	detail, err := h.im.DescribeUser(authenticated.GetName())
-	if err != nil {
-		response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
-		return
-	}
-
+	//// 根据token获取用户信息
+	//authenticated, _ := request.UserFrom(req.Request.Context())
+	//if authenticated == nil || authenticated.GetName() == user.Anonymous {
+	//	response.WriteHeaderAndEntity(http.StatusUnauthorized, oauth.ErrorLoginRequired)
+	//	return
+	//}
+	//detail, err := h.im.DescribeUser(authenticated.GetName())
+	//if err != nil {
+	//	response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
+	//	return
+	//}
+	username := req.QueryParameter("username")
 	//判断用户角色，普通用户只能获取自己的otp二维码
-	isAdmin := h.passcodeAuthenticator.IsAdmin(detail.Name)
+	isAdmin := h.passcodeAuthenticator.IsAdmin(username)
 	if isAdmin {
-		username := req.QueryParameter("username")
+
 		if username == "" {
 			response.WriteErrorString(http.StatusBadRequest, "username is null")
 			return
 		}
 		h.passcodeAuthenticator.OtpBarcode(req, response, username)
 	} else {
-		h.passcodeAuthenticator.OtpBarcode(req, response, detail.Name)
+		h.passcodeAuthenticator.OtpBarcode(req, response, username)
 	}
 
 }
