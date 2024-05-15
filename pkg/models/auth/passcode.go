@@ -152,53 +152,56 @@ func (p *passcodeAuthenticator) Authenticate(ctx context.Context, username, pass
 		}
 	}
 
-	// check user 2fa status
-	if user != nil && user.Spec.FAOpenStatus && passcode == "" {
-		u := &authuser.DefaultInfo{
-			Name:   user.Name,
-			Groups: user.Spec.Groups,
-		}
-		u.Extra = map[string][]string{
-			iamv1alpha2.ExtraFAOpenStatus: {strconv.FormatBool(user.Spec.FAOpenStatus)},
-			iamv1alpha2.ExtraFAType:       {user.Spec.FAType},
-			iamv1alpha2.ExtraOTPBind:      {strconv.FormatBool(user.Spec.OTPBind)},
-		}
-
-		return u, "", nil
-	}
-	//OTP Verify
-	if user != nil && user.Spec.FAOpenStatus && user.Spec.FAType == iamv1alpha2.FATypeOtp {
-		orig, _ := b32NoPadding.DecodeString(user.Spec.OTPKey.Orig)
-		otpKey, _ := otp.NewKeyFromURL(string(orig))
-		if user.Spec.OTPKey != nil && !totp.Validate(passcode, otpKey.Secret(), uint(otpKey.Period())) {
-			return nil, "", IncorrectOtpError
-		}
-		if !user.Spec.OTPBind {
-			// update otp bind status
-			user.Spec.OTPBind = true
-			_, err = p.ksClient.IamV1alpha2().Users().Update(ctx, user, metav1.UpdateOptions{})
-			if err != nil {
-				klog.Error(err)
-				return nil, "", err
-			}
-		}
-
-	}
-
-	// SMS Verify
-	if user != nil && user.Spec.FAOpenStatus && user.Spec.FAType == iamv1alpha2.FATypeSms {
-		orig, _ := b32NoPadding.DecodeString(user.Spec.SMSKey.Orig)
-		smsKey, _ := otp.NewKeyFromURL(string(orig))
-		if user.Spec.SMSKey != nil && !totp.Validate(passcode, smsKey.Secret(), uint(smsKey.Period())) {
-			return nil, "", IncorrectSmsError
-		}
-	}
 	// if the password is not empty, means that the password has been reset, even if the user was mapping from IDP
 	if user != nil && user.Spec.EncryptedPassword != "" {
 		if err = PasswordVerify(user.Spec.EncryptedPassword, password); err != nil {
 			klog.Error(err)
 			return nil, "", err
 		}
+
+		// check user 2fa status
+		if user != nil && user.Spec.FAOpenStatus && passcode == "" {
+			u := &authuser.DefaultInfo{
+				Name:   user.Name,
+				Groups: user.Spec.Groups,
+			}
+			u.Extra = map[string][]string{
+				iamv1alpha2.ExtraFAOpenStatus: {strconv.FormatBool(user.Spec.FAOpenStatus)},
+				iamv1alpha2.ExtraFAType:       {user.Spec.FAType},
+				iamv1alpha2.ExtraOTPBind:      {strconv.FormatBool(user.Spec.OTPBind)},
+			}
+
+			return u, "", nil
+		}
+
+		//OTP Verify
+		if user != nil && user.Spec.FAOpenStatus && user.Spec.FAType == iamv1alpha2.FATypeOtp {
+			orig, _ := b32NoPadding.DecodeString(user.Spec.OTPKey.Orig)
+			otpKey, _ := otp.NewKeyFromURL(string(orig))
+			if user.Spec.OTPKey != nil && !totp.Validate(passcode, otpKey.Secret(), uint(otpKey.Period())) {
+				return nil, "", IncorrectOtpError
+			}
+			if !user.Spec.OTPBind {
+				// update otp bind status
+				user.Spec.OTPBind = true
+				_, err = p.ksClient.IamV1alpha2().Users().Update(ctx, user, metav1.UpdateOptions{})
+				if err != nil {
+					klog.Error(err)
+					return nil, "", err
+				}
+			}
+
+		}
+
+		// SMS Verify
+		if user != nil && user.Spec.FAOpenStatus && user.Spec.FAType == iamv1alpha2.FATypeSms {
+			orig, _ := b32NoPadding.DecodeString(user.Spec.SMSKey.Orig)
+			smsKey, _ := otp.NewKeyFromURL(string(orig))
+			if user.Spec.SMSKey != nil && !totp.Validate(passcode, smsKey.Secret(), uint(smsKey.Period())) {
+				return nil, "", IncorrectSmsError
+			}
+		}
+
 		u := &authuser.DefaultInfo{
 			Name:   user.Name,
 			Groups: user.Spec.Groups,
