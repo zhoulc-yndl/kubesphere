@@ -18,6 +18,7 @@ package multauth
 
 import (
 	"k8s.io/client-go/kubernetes"
+	iamv1alpha2 "kubesphere.io/api/iam/v1alpha2"
 	resourcev1alpha3 "kubesphere.io/kubesphere/pkg/models/resources/v1alpha3/resource"
 	"net/http"
 
@@ -82,20 +83,15 @@ func (h *handler) enable2fa(req *restful.Request, response *restful.Response) {
 			response.WriteHeaderAndEntity(http.StatusBadRequest, "faType is null")
 			return
 		}
+		// 短信发送配置检查
+		if faType == iamv1alpha2.FATypeSms {
+			_, err := h.resourceGetterV1alpha3.Get("secrets", "default", "global-sms-config-secret")
+			if err != nil {
+				api.HandleBadRequest(response, req, err)
+				return
+			}
 
-		//else if faType == iamv1alpha2.FATypeOtp {
-		//	if issuer == "" {
-		//		response.WriteHeaderAndEntity(http.StatusBadRequest, "issuer is null")
-		//		return
-		//	}
-		//	h.passcodeAuthenticator.EnableOTP(req, response, username, issuer, global)
-		//} else if faType == iamv1alpha2.FATypeSms {
-		//	if username == "" {
-		//		response.WriteHeaderAndEntity(http.StatusBadRequest, "username is null")
-		//		return
-		//	}
-		//	h.passcodeAuthenticator.EnableSMS(req, response, username, global)
-		//}
+		}
 		h.passcodeAuthenticator.Enable2fa(req, response, username, issuer, faType, global)
 	} else {
 		response.WriteHeaderAndEntity(http.StatusForbidden, http.StatusText(http.StatusForbidden))
@@ -130,17 +126,6 @@ func (h *handler) disable2fa(req *restful.Request, response *restful.Response) {
 }
 
 func (h *handler) otpBarcode(req *restful.Request, response *restful.Response) {
-	//// 根据token获取用户信息
-	//authenticated, _ := request.UserFrom(req.Request.Context())
-	//if authenticated == nil || authenticated.GetName() == user.Anonymous {
-	//	response.WriteHeaderAndEntity(http.StatusUnauthorized, oauth.ErrorLoginRequired)
-	//	return
-	//}
-	//detail, err := h.im.DescribeUser(authenticated.GetName())
-	//if err != nil {
-	//	response.WriteHeaderAndEntity(http.StatusInternalServerError, oauth.NewServerError(err))
-	//	return
-	//}
 
 	username := req.QueryParameter("username")
 	//判断用户角色，普通用户只能获取自己的otp二维码
