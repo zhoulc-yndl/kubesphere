@@ -602,7 +602,7 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 
 	phone, err := strconv.Atoi(user.Spec.Phone)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 		response.WriteHeaderAndEntity(http.StatusBadRequest, "invalid phone number")
 		return
 	}
@@ -639,8 +639,8 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		result, err := gosms.Sender(number, message, gateway)
 		resp, ok := result.ClientResult.Response.(ywxt.Response)
 		if !ok {
-			log.Fatal(err)
-			response.WriteHeaderAndEntity(http.StatusBadRequest, resp.Msg)
+			log.Println(err)
+			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
 			return
 		}
 		response.WriteHeaderAndEntity(http.StatusOK, resp)
@@ -656,7 +656,7 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		result, err := gosms.Sender(number, message, gateway)
 		resp, ok := result.ClientResult.Response.(ihuyi.Response)
 		if !ok {
-			log.Fatal(err)
+			log.Println(err)
 			response.WriteHeaderAndEntity(http.StatusBadRequest, resp.Msg)
 			return
 		}
@@ -673,7 +673,7 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		result, err := gosms.Sender(number, message, gateway)
 		resp, ok := result.ClientResult.Response.(aliyun.Response)
 		if !ok {
-			log.Fatal(err)
+			log.Println(err)
 			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
 			return
 		}
@@ -690,7 +690,7 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		result, err := gosms.Sender(number, message, gateway)
 		resp, ok := result.ClientResult.Response.(juhe.Response)
 		if !ok {
-			log.Fatal(err)
+			log.Println(err)
 			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
 			return
 		}
@@ -708,7 +708,7 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		result, err := gosms.Sender(number, message, gateway)
 		resp, ok := result.ClientResult.Response.(lmobile.Response)
 		if !ok {
-			log.Fatal(err)
+			log.Println(err)
 			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
 			return
 		}
@@ -725,7 +725,7 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		result, err := gosms.Sender(number, message, gateway)
 		resp, ok := result.ClientResult.Response.(smsbao.Response)
 		if !ok {
-			log.Fatal(err)
+			log.Println(err)
 			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
 			return
 		}
@@ -745,7 +745,7 @@ func (p *passcodeAuthenticator) SendMessage(request *restful.Request, response *
 		result, err := gosms.Sender(number, message, gateway)
 		resp, ok := result.ClientResult.Response.(yunxin.Response)
 		if !ok {
-			log.Fatal(err)
+			log.Println(err)
 			response.WriteHeaderAndEntity(http.StatusBadRequest, err)
 			return
 		}

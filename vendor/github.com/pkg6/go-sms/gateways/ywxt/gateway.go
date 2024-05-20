@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/pkg6/go-sms"
 	"io"
 	"log"
@@ -20,7 +21,7 @@ type Ywxt struct {
 	gosms.Lock
 }
 
-func GateWay(appName, appSecret,host,sendUrl,tokenUrl string) gosms.IGateway {
+func GateWay(appName, appSecret, host, sendUrl, tokenUrl string) gosms.IGateway {
 	gateway := &Ywxt{
 		AppName:   appName,
 		AppSecret: appSecret,
@@ -65,33 +66,39 @@ func (g *Ywxt) query() gosms.MapStrings {
 func (g *Ywxt) getAccessToken(appSecret string) string {
 	query := g.query()
 	query["corpsecret"] = appSecret
-	res, err := gosms.Client.Get(context.Background(), g.Host+"/"+g.TokenUrl, query)
+	res, err := gosms.Client.Get(context.Background(), g.Host+"/"+g.TokenUrl+"?corpsecret="+appSecret, nil)
 
 	//res, err := http.Get(string(tokenUrl) + "?corpsecret=" + string(appSecret))
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return ""
 	}
 	body, err := io.ReadAll(res.Body)
 	res.Body.Close()
 	if res.StatusCode > 299 {
-		log.Fatal(body)
+		log.Println(body)
+		return ""
 	}
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return ""
 
 	}
 	var result map[string]interface{}
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return ""
 	}
 	errCode, ok := result["errcode"].(float64)
 	if errCode != 0 {
-		log.Fatal(ok)
+		log.Println(result)
+		return ""
 	}
 	accessToken, ok := result["access_token"].(string)
 	if !ok {
-		log.Fatal(ok)
+		log.Println(ok)
+		return ""
 	}
 	return accessToken
 }
@@ -115,13 +122,16 @@ func (g *Ywxt) Send(to gosms.IPhoneNumber, message gosms.IMessage) (gosms.SMSRes
 			AppName: g.AppName,
 		},
 	}
-
+	result := gosms.SMSResult{}
 	accessToken := g.getAccessToken(g.AppSecret)
+	if accessToken == "" {
+		return result, fmt.Errorf("access token err")
+	}
 	client := gosms.Client
 	client.WithHeader("Content-Type", "application/json")
 	response, err := client.PostJson(context.Background(), g.Host+"/"+g.SendUrl+"?access_token="+accessToken, postBody)
 	err = response.Unmarshal(&resp)
-	result := gosms.BuildSMSResult(to, message, g.I(), resp)
+	result = gosms.BuildSMSResult(to, message, g.I(), resp)
 	if err != nil {
 		return result, err
 	}
