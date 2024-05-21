@@ -544,6 +544,7 @@ func (p *passcodeAuthenticator) ResetOTP(req *restful.Request, response *restful
 	// update user set 2fa open status and otpKey info
 	user.Spec.FAOpenStatus = true
 	user.Spec.OTPBind = false
+	user.Spec.Issuer = issuer
 	_, err = p.ksClient.IamV1alpha2().Users().Update(req.Request.Context(), user, metav1.UpdateOptions{})
 	if err != nil {
 		klog.Error(err)
